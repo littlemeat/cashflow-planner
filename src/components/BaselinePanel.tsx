@@ -4,10 +4,11 @@ import { usePlanStore } from "../store/usePlanStore";
 import { Baseline } from "../types";
 import { AmountInput } from "./AmountInput";
 
-export function BaselinePanel({ onCollapse }: { onCollapse?: () => void }) {
+export function BaselinePanel() {
   const { plan, setBaseline } = usePlanStore();
   const [form, setForm] = useState<Baseline>(plan.baseline);
   const [saved, setSaved] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Sync if plan changes externally (import/reset)
   useEffect(() => {
@@ -32,16 +33,17 @@ export function BaselinePanel({ onCollapse }: { onCollapse?: () => void }) {
   return (
     <div className="bg-white rounded-xl shadow p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Počáteční nastavení</h2>
-        {onCollapse && (
-          <button onClick={onCollapse} className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Skrýt" aria-label="Skrýt panel">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        )}
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+        >
+          <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          Počáteční nastavení
+        </button>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {!collapsed && <form onSubmit={handleSubmit} className="space-y-4">
         {/* Start date */}
         <div>
           <label htmlFor="baseline-startDate" className="block text-sm font-medium text-gray-700 mb-1">
@@ -155,7 +157,7 @@ export function BaselinePanel({ onCollapse }: { onCollapse?: () => void }) {
         >
           {saved ? "Uloženo ✓" : "Uložit nastavení"}
         </button>
-      </form>
+      </form>}
     </div>
   );
 }
