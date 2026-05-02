@@ -52,7 +52,7 @@ export function PrevzetiHypoteky({ onClose }: Props) {
       addEvent({
         name: `Vlastní prostředky – ${mortgageName}`,
         category: "expense",
-        frequency: "once",
+        frequency: "one-off",
         amount: cashPayment,
         startMonth: takeoverOffset,
         endMonth: null,
