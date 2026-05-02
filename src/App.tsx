@@ -5,6 +5,7 @@ import { Plan } from "./types";
 import { BaselinePanel } from "./components/BaselinePanel";
 import { EventsPanel } from "./components/EventsPanel";
 import { MortgagePanel } from "./components/MortgagePanel";
+import { AssetsPanel } from "./components/AssetsPanel";
 import { ResultsSummary, ResultsChart } from "./components/ResultsPanel";
 import { formatYearMonth } from "./lib/formatters";
 
@@ -141,6 +142,7 @@ export default function App() {
           <BaselinePanel />
           <EventsPanel />
           <MortgagePanel />
+          <AssetsPanel />
         </div>
 
         {/* Bottom row: full-width chart + table */}

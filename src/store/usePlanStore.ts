@@ -1,7 +1,7 @@
 // Zustand store for the cashflow planner plan
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
-import { Plan, Baseline, CashflowEvent, Mortgage, MonthlySnapshot } from "../types";
+import { Plan, Baseline, CashflowEvent, Mortgage, Asset, MonthlySnapshot } from "../types";
 import { SEED_PLAN } from "../lib/seedData";
 import { simulate } from "../lib/simulate";
 import { dateToMonthOffset, monthOffsetToDate } from "../lib/formatters";
@@ -33,14 +33,20 @@ function rebaseOffsets(plan: Plan, oldStartDate: string, newStartDate: string): 
     // rateSchedule.fromMonth is relative to mortgage start, not plan start — leave untouched
   }));
 
-  return { ...plan, events, mortgages };
+  const assets = (plan.assets ?? []).map((a) => ({
+    ...a,
+    acquisitionMonth: rebase(a.acquisitionMonth),
+  }));
+
+  return { ...plan, events, mortgages, assets };
 }
 
-// Migrate old single extraPayment to extraPayments array
+// Migrate old plan formats: add assets[] if missing, convert single extraPayment to array
 function migratePlan(raw: unknown): Plan {
   const plan = raw as Plan & { mortgages: Array<Record<string, unknown>> };
   return {
     ...plan,
+    assets: plan.assets ?? [],
     mortgages: plan.mortgages.map((m) => {
       const legacy = m as unknown as Record<string, unknown>;
       if (legacy["extraPayment"] && !legacy["extraPayments"]) {
@@ -102,6 +108,9 @@ interface PlanStore {
   addMortgage: (mortgage: Omit<Mortgage, "id">) => void;
   updateMortgage: (id: string, mortgage: Partial<Mortgage>) => void;
   deleteMortgage: (id: string) => void;
+  addAsset: (asset: Omit<Asset, "id">) => void;
+  updateAsset: (id: string, asset: Partial<Asset>) => void;
+  deleteAsset: (id: string) => void;
   importPlan: (plan: Plan) => void;
   resetToSeed: () => void;
   reorderEvents: (orderedIds: string[]) => void;
@@ -194,6 +203,34 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       const updated = touchPlan({
         ...state.plan,
         mortgages: state.plan.mortgages.filter((m) => m.id !== id),
+      });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
+    }),
+
+  addAsset: (assetData) =>
+    set((state) => {
+      const newAsset: Asset = { ...assetData, id: uuidv4() };
+      const updated = touchPlan({ ...state.plan, assets: [...(state.plan.assets ?? []), newAsset] });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
+    }),
+
+  updateAsset: (id, assetData) =>
+    set((state) => {
+      const updated = touchPlan({
+        ...state.plan,
+        assets: (state.plan.assets ?? []).map((a) => (a.id === id ? { ...a, ...assetData } : a)),
+      });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
+    }),
+
+  deleteAsset: (id) =>
+    set((state) => {
+      const updated = touchPlan({
+        ...state.plan,
+        assets: (state.plan.assets ?? []).filter((a) => a.id !== id),
       });
       saveToStorage(updated);
       return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };

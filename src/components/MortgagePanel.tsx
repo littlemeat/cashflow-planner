@@ -5,6 +5,57 @@ import { Mortgage } from "../types";
 import { MortgageForm } from "./MortgageForm";
 import { formatCZK, formatYearMonth, addMonths, computeMonthlyPayment } from "../lib/formatters";
 
+// Compute the remaining principal at a given number of months into the mortgage,
+// assuming constant payment from the first rate period.
+function principalAtMonth(mortgage: Mortgage, months: number): number {
+  const rate = mortgage.rateSchedule[0]?.rateAnnual ?? 0;
+  const r = rate / 12;
+  const payment = computeMonthlyPayment(mortgage.principal, rate, mortgage.termMonths);
+  if (r === 0) return Math.max(0, mortgage.principal - payment * months);
+  return (
+    mortgage.principal * Math.pow(1 + r, months) -
+    payment * ((Math.pow(1 + r, months) - 1) / r)
+  );
+}
+
+// Compute per-period payments for each rate schedule entry
+interface RatePeriodPayment {
+  fromMonth: number;
+  rateAnnual: number;
+  monthlyPayment: number;
+}
+
+function getRatePeriodPayments(mortgage: Mortgage): RatePeriodPayment[] {
+  return mortgage.rateSchedule.map((rate, idx) => {
+    if (idx === 0) {
+      // First period: use original principal and full term
+      return {
+        fromMonth: rate.fromMonth,
+        rateAnnual: rate.rateAnnual,
+        monthlyPayment: computeMonthlyPayment(
+          mortgage.principal,
+          rate.rateAnnual,
+          mortgage.termMonths
+        ),
+      };
+    }
+    // Subsequent periods: compute remaining principal at rate boundary
+    const prevRate = mortgage.rateSchedule[idx - 1]!;
+    const monthsElapsed = rate.fromMonth - prevRate.fromMonth;
+    const remaining = principalAtMonth(mortgage, monthsElapsed);
+    const remainingMonths = mortgage.termMonths - rate.fromMonth;
+    return {
+      fromMonth: rate.fromMonth,
+      rateAnnual: rate.rateAnnual,
+      monthlyPayment: computeMonthlyPayment(
+        Math.max(0, remaining),
+        rate.rateAnnual,
+        Math.max(1, remainingMonths)
+      ),
+    };
+  });
+}
+
 export function MortgagePanel() {
   const { plan, addMortgage, updateMortgage, deleteMortgage } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
@@ -12,13 +63,6 @@ export function MortgagePanel() {
   const [collapsed, setCollapsed] = useState(false);
 
   const startDate = plan.baseline.startDate;
-
-  // Compute monthly payment using the first rate period (initial annuity)
-  function getInitialPayment(mortgage: Mortgage): number {
-    const firstRate = mortgage.rateSchedule[0];
-    if (!firstRate) return 0;
-    return computeMonthlyPayment(mortgage.principal, firstRate.rateAnnual, mortgage.termMonths);
-  }
 
   function handleAdd(data: Omit<Mortgage, "id">) {
     addMortgage(data);
@@ -66,7 +110,8 @@ export function MortgagePanel() {
       ) : (
         <div className="space-y-4">
           {plan.mortgages.map((mortgage) => {
-            const monthlyPayment = getInitialPayment(mortgage);
+            const ratePeriodPayments = getRatePeriodPayments(mortgage);
+            const firstPeriod = ratePeriodPayments[0];
             const mortgageStart = addMonths(startDate, mortgage.startMonth);
             const mortgageEnd = addMonths(startDate, mortgage.startMonth + mortgage.termMonths);
 
@@ -116,28 +161,29 @@ export function MortgagePanel() {
                       <span className="font-medium text-gray-800">{formatCZK(mortgage.insuranceMonthly)}/měs.</span>
                     </div>
                   )}
-                  <div className="col-span-2">
-                    <span className="text-gray-500">Odhadovaná splátka:</span>{" "}
-                    <span className="font-bold text-blue-700 text-base">{formatCZK(monthlyPayment)}/měs.</span>
-                    {mortgage.insuranceMonthly != null && mortgage.insuranceMonthly > 0 && (
-                      <span className="text-gray-400 text-xs ml-2">
-                        (+ {formatCZK(mortgage.insuranceMonthly)} pojistné = {formatCZK(monthlyPayment + mortgage.insuranceMonthly)}/měs.)
-                      </span>
-                    )}
-                  </div>
+                  {firstPeriod && mortgage.insuranceMonthly != null && mortgage.insuranceMonthly > 0 && (
+                    <div className="col-span-2 text-xs text-gray-400">
+                      Splátka + pojistné (1. období): {formatCZK(firstPeriod.monthlyPayment + mortgage.insuranceMonthly)}/měs.
+                    </div>
+                  )}
                 </div>
 
-                {/* Rate schedule */}
+                {/* Rate schedule with per-period payment */}
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sazby</p>
-                  <div className="flex flex-wrap gap-2">
-                    {mortgage.rateSchedule.map((rate) => (
-                      <span
-                        key={rate.id}
-                        className="inline-block bg-gray-100 rounded-full px-3 py-1 text-xs text-gray-700"
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sazby + splátky</p>
+                  <div className="space-y-1">
+                    {ratePeriodPayments.map((period) => (
+                      <div
+                        key={period.fromMonth}
+                        className="flex items-center gap-2 text-xs text-gray-700"
                       >
-                        od měs. {rate.fromMonth}: {(rate.rateAnnual * 100).toFixed(2)} % p.a.
-                      </span>
+                        <span className="bg-gray-100 rounded-full px-3 py-1 whitespace-nowrap">
+                          od měs. {period.fromMonth}:{" "}
+                          <span className="font-medium">{(period.rateAnnual * 100).toFixed(2)} %</span>
+                          {" → "}
+                          <span className="font-bold text-blue-700">{formatCZK(period.monthlyPayment)}/měs.</span>
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>

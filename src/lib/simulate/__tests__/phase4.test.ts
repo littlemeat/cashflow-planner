@@ -23,6 +23,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
     baseline,
     events: [],
     mortgages: [],
+    assets: [],
     ...overrides,
   };
 }

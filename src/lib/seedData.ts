@@ -90,4 +90,5 @@ export const SEED_PLAN: Plan = {
       insuranceMonthly: 500,
     },
   ],
+  assets: [],
 };

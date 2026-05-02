@@ -1,5 +1,5 @@
 // Pure simulation engine — produces MonthlySnapshot[] from a Plan
-import { Plan, MonthlySnapshot, FrequencyType } from "../../types";
+import { Plan, MonthlySnapshot, FrequencyType, Asset } from "../../types";
 import { addMonths } from "../formatters";
 import { initMortgageState, stepMortgage, MortgageState } from "./mortgage";
 
@@ -28,6 +28,7 @@ export interface MonthDetail {
   investmentYield: number;    // actual CZK growth from yield this month
   cashAccount: number;
   investmentsBalance: number;
+  assetsValue: number;        // total market value of assets this month
   contributions: EventContribution[];  // per-event breakdown
   flags: string[];
   runwayMonths: number;
@@ -38,6 +39,7 @@ export interface MonthDetail {
 interface AppliedEvents {
   income: number;
   expenses: number;
+  recurringExpenses: number;   // expenses excluding one-off frequency
   contributions: EventContribution[];
 }
 
@@ -46,6 +48,7 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
   const horizonMonths = baseline.horizonYears * 12;
   let income = 0;
   let expenses = 0;
+  let recurringExpenses = 0;
   const contributions: EventContribution[] = [];
 
   for (const evt of events) {
@@ -75,6 +78,10 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
       income += amount;
     } else {
       expenses += amount;
+      // Only count recurring (monthly/yearly) expenses for the safety buffer average
+      if (evt.frequency !== "one-off") {
+        recurringExpenses += amount;
+      }
     }
 
     contributions.push({
@@ -86,7 +93,7 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
     });
   }
 
-  return { income, expenses, contributions };
+  return { income, expenses, recurringExpenses, contributions };
 }
 
 // ── getMonthDetail ────────────────────────────────────────────────────────────
@@ -102,7 +109,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
 
   let cashAccount = baseline.cashAccount;
   let investmentsBalance = baseline.investmentsBalance;
-  const recentExpenses: number[] = [];
+  const recurringExpensesHistory: number[] = [];
 
   let resultDetail: MonthDetail = {
     month: clampedTarget,
@@ -117,6 +124,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     investmentYield: 0,
     cashAccount: 0,
     investmentsBalance: 0,
+    assetsValue: 0,
     contributions: [],
     flags: [],
     runwayMonths: 0,
@@ -126,7 +134,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     const flags: string[] = [];
 
     // Apply events using shared helper
-    const { income, expenses, contributions } = applyEvents(plan, m);
+    const { income, expenses, recurringExpenses, contributions } = applyEvents(plan, m);
 
     // Compute mortgage payments
     let totalMortgagePayment = 0;
@@ -154,26 +162,33 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
 
     cashAccount += netCashflow;
 
-    recentExpenses.push(expenses + totalMortgagePayment + totalInsurance);
-    if (recentExpenses.length > 3) recentExpenses.shift();
+    // Trailing 12-month average of recurring expenses + mortgage (excludes one-off items)
+    recurringExpensesHistory.push(recurringExpenses + totalMortgagePayment + totalInsurance);
+    if (recurringExpensesHistory.length > 12) recurringExpensesHistory.shift();
 
-    const avgExpenses =
-      recentExpenses.length > 0
-        ? recentExpenses.reduce((a, b) => a + b, 0) / recentExpenses.length
+    const avgRecurring =
+      recurringExpensesHistory.length > 0
+        ? recurringExpensesHistory.reduce((a, b) => a + b, 0) / recurringExpensesHistory.length
         : 0;
+    const targetCash = baseline.safetyBufferMonths * avgRecurring;
 
-    // Only this month's surplus goes to investments — never sweep accumulated cash
-    const investedThisMonth = netCashflow > 0 ? netCashflow : 0;
-    if (investedThisMonth > 0) {
-      investmentsBalance += investedThisMonth;
-      cashAccount -= investedThisMonth;
-    }
-
-    if (cashAccount < 0 && investmentsBalance > 0) {
-      const withdrawal = Math.min(-cashAccount, investmentsBalance);
-      investmentsBalance -= withdrawal;
-      cashAccount += withdrawal;
-      flags.push("investments-withdrawn");
+    let investedThisMonth = 0;
+    if (netCashflow >= 0) {
+      // Move surplus above target cash to investments
+      const surplus = Math.max(0, cashAccount - targetCash);
+      if (surplus > 0) {
+        investmentsBalance += surplus;
+        cashAccount -= surplus;
+        investedThisMonth = surplus;
+      }
+    } else {
+      // Deficit month: if cash went negative, pull from investments just to 0
+      if (cashAccount < 0 && investmentsBalance > 0) {
+        const withdrawal = Math.min(-cashAccount, investmentsBalance);
+        investmentsBalance -= withdrawal;
+        cashAccount += withdrawal;
+        flags.push("investments-withdrawn");
+      }
     }
 
     if (cashAccount < 0) {
@@ -185,8 +200,8 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     investmentsBalance *= monthlyGrowthFactor;
 
     const runwayMonths =
-      avgExpenses > 0
-        ? (cashAccount + investmentsBalance) / avgExpenses
+      avgRecurring > 0
+        ? (cashAccount + investmentsBalance) / avgRecurring
         : Infinity;
 
     if (m === clampedTarget) {
@@ -206,11 +221,24 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
         contributions,
         flags,
         runwayMonths,
+        assetsValue: computeAssetsValue(plan.assets ?? [], m),
       };
     }
   }
 
   return resultDetail;
+}
+
+// ── Asset value computation ───────────────────────────────────────────────────
+
+function computeAssetsValue(assets: Asset[], m: number): number {
+  return assets.reduce((sum, asset) => {
+    if (m < asset.acquisitionMonth) return sum;
+    const monthsHeld = m - asset.acquisitionMonth;
+    const value =
+      asset.purchaseValue * Math.pow(1 + asset.appreciationAnnual, monthsHeld / 12);
+    return sum + value;
+  }, 0);
 }
 
 export function simulate(plan: Plan): MonthlySnapshot[] {
@@ -226,8 +254,8 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
   let cashAccount = baseline.cashAccount;
   let investmentsBalance = baseline.investmentsBalance;
 
-  // For safety buffer computation: track last 3 months of (expenses + mortgagePayment)
-  const recentExpenses: number[] = [];
+  // Trailing 12-month history of recurring expenses + mortgage for safety buffer target
+  const recurringExpensesHistory: number[] = [];
 
   const snapshots: MonthlySnapshot[] = [];
 
@@ -235,7 +263,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
     const flags: string[] = [];
 
     // ── Step 1: Apply events ──────────────────────────────────────────────────
-    const { income, expenses } = applyEvents(plan, m);
+    const { income, expenses, recurringExpenses } = applyEvents(plan, m);
 
     // ── Step 2: Compute mortgage payments ────────────────────────────────────
     let totalMortgagePayment = 0;
@@ -269,27 +297,31 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
     // ── Step 4: Apply to accounts ────────────────────────────────────────────
     cashAccount += netCashflow;
 
-    // Track recent expenses for runway calculation
-    recentExpenses.push(expenses + totalMortgagePayment + totalInsurance);
-    if (recentExpenses.length > 3) recentExpenses.shift();
+    // Trailing 12-month average of recurring expenses + mortgage (excludes one-off items)
+    recurringExpensesHistory.push(recurringExpenses + totalMortgagePayment + totalInsurance);
+    if (recurringExpensesHistory.length > 12) recurringExpensesHistory.shift();
 
-    const avgExpenses =
-      recentExpenses.length > 0
-        ? recentExpenses.reduce((a, b) => a + b, 0) / recentExpenses.length
+    const avgRecurring =
+      recurringExpensesHistory.length > 0
+        ? recurringExpensesHistory.reduce((a, b) => a + b, 0) / recurringExpensesHistory.length
         : 0;
+    const targetCash = baseline.safetyBufferMonths * avgRecurring;
 
-    // Only this month's surplus goes to investments — never sweep accumulated cash
-    if (netCashflow > 0) {
-      investmentsBalance += netCashflow;
-      cashAccount -= netCashflow;
-    }
-
-    // If cash went negative (deficit month), withdraw from investments first
-    if (cashAccount < 0 && investmentsBalance > 0) {
-      const withdrawal = Math.min(-cashAccount, investmentsBalance);
-      investmentsBalance -= withdrawal;
-      cashAccount += withdrawal;
-      flags.push("investments-withdrawn");
+    if (netCashflow >= 0) {
+      // Move surplus above target cash to investments
+      const surplus = Math.max(0, cashAccount - targetCash);
+      if (surplus > 0) {
+        investmentsBalance += surplus;
+        cashAccount -= surplus;
+      }
+    } else {
+      // Deficit month: if cash went negative, pull from investments just to 0
+      if (cashAccount < 0 && investmentsBalance > 0) {
+        const withdrawal = Math.min(-cashAccount, investmentsBalance);
+        investmentsBalance -= withdrawal;
+        cashAccount += withdrawal;
+        flags.push("investments-withdrawn");
+      }
     }
 
     if (cashAccount < 0) {
@@ -306,10 +338,11 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
       (sum, s, i) => sum + (mortgages[i]!.startMonth <= m ? s.remainingPrincipal : 0),
       0
     );
-    const netWorth = cashAccount + investmentsBalance - mortgageBalance;
+    const assetsValue = computeAssetsValue(plan.assets ?? [], m);
+    const netWorth = cashAccount + investmentsBalance + assetsValue - mortgageBalance;
     const runwayMonths =
-      avgExpenses > 0
-        ? (cashAccount + investmentsBalance) / avgExpenses
+      avgRecurring > 0
+        ? (cashAccount + investmentsBalance) / avgRecurring
         : Infinity;
 
     snapshots.push({
@@ -324,6 +357,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
       cashAccount,
       investmentsBalance,
       mortgageBalance,
+      assetsValue,
       netWorth,
       runwayMonths,
       flags,

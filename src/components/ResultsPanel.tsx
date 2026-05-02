@@ -119,6 +119,7 @@ interface TableRow {
   annualIncome: number;
   annualExpenses: number;
   annualMortgagePayment: number;
+  assetsValueEnd: number;    // end-of-year asset value (balance, not a flow)
 }
 
 function buildYearlyTable(snapshots: MonthlySnapshot[], startDate: string): TableRow[] {
@@ -139,7 +140,7 @@ function buildYearlyTable(snapshots: MonthlySnapshot[], startDate: string): Tabl
     const annualIncome = yearSnaps.reduce((sum, s) => sum + s.income, 0);
     const annualExpenses = yearSnaps.reduce((sum, s) => sum + s.expenses, 0);
     const annualMortgagePayment = yearSnaps.reduce((sum, s) => sum + s.mortgagePayment, 0);
-    rows.push({ year: baseYear + yearIdx, snapshot: snap, annualIncome, annualExpenses, annualMortgagePayment });
+    rows.push({ year: baseYear + yearIdx, snapshot: snap, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd: snap.assetsValue });
     if (pickMonth >= maxMonth) break;
     yearIdx++;
   }
@@ -197,10 +198,13 @@ export function ResultsSummary() {
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            <KpiCard label="Čisté jmění" value={formatCZK(snap.netWorth)} color="text-purple-700" bg="bg-purple-50" />
+            <KpiCard label="Čisté jmění" value={formatCZK(snap.netWorth)} color="text-purple-700" bg="bg-purple-50"
+              tooltip="Čisté jmění = hotovost + investice + majetek − zbývající jistina hypotéky." />
             <KpiCard label="Hotovost" value={formatCZK(snap.cashAccount)} color="text-blue-700" bg="bg-blue-50" />
             <KpiCard label="Investice" value={formatCZK(snap.investmentsBalance)} color="text-green-700" bg="bg-green-50"
               tooltip="Zůstatek na investičním účtu (ETF, fondy apod.) k vybranému měsíci. Přebytek hotovosti nad bezpečnostní rezervou se automaticky přesouvá sem. Počáteční výši zadáš v Počátečním nastavení → Investice – zůstatek." />
+            <KpiCard label="Majetek" value={formatCZK(snap.assetsValue)} color="text-indigo-700" bg="bg-indigo-50"
+              tooltip="Celková tržní hodnota nemovitostí a dalšího majetku ke konci vybraného měsíce. Hodnota každého aktiva roste ročním procentem zhodnocení nastaveným v panelu Majetek." />
             <KpiCard label="Zůstatek hypotéky" value={formatCZK(snap.mortgageBalance)} color="text-orange-700" bg="bg-orange-50" />
             {/* Runway with info tooltip */}
             <div className="bg-gray-50 rounded-xl px-4 py-3 flex flex-col justify-between min-w-[110px]">
@@ -441,7 +445,8 @@ export function ResultsChart() {
                 <Th tip={tableMode === "yearly"
                   ? "Zůstatek investičního portfolia ke konci roku. Sem automaticky putuje přebytek hotovosti nad bezpečnostní rezervu. Roste i o výnos (nastavený v Počátečním nastavení)."
                   : "Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem."}>Investice</Th>
-                <Th tip="Čisté jmění = hotovost + investice − zbývající jistina hypotéky.">Čisté jmění</Th>
+                <Th tip="Celková tržní hodnota nemovitostí a dalšího majetku ke konci měsíce.">Majetek</Th>
+                <Th tip="Čisté jmění = hotovost + investice + majetek − zbývající jistina hypotéky.">Čisté jmění</Th>
                 <Th tip="Zbývající jistina hypotéky ke konci období — klesá s každou splátkou.">Hypo zůstatek</Th>
                 <th className="px-3 py-2 text-right"></th>
               </tr>
@@ -455,12 +460,13 @@ export function ResultsChart() {
                 <td className="px-3 py-2 text-right">—</td>
                 <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.cashAccount)}</td>
                 <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.investmentsBalance)}</td>
+                <td className="px-3 py-2 text-right text-indigo-700">—</td>
                 <td className="px-3 py-2 text-right text-purple-600 font-medium not-italic">{formatCZK(plan.baseline.cashAccount + plan.baseline.investmentsBalance)}</td>
                 <td className="px-3 py-2 text-right">—</td>
                 <td className="px-3 py-2"></td>
               </tr>
               {tableMode === "yearly"
-                ? yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment }) => (
+                ? yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd }) => (
                     <tr
                       key={year}
                       onClick={() => setDetailMonth(s.month)}
@@ -476,6 +482,7 @@ export function ResultsChart() {
                       <td className="px-3 py-2 text-right text-orange-700">{formatCZK(annualMortgagePayment)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
+                      <td className="px-3 py-2 text-right text-indigo-700">{formatCZK(assetsValueEnd)}</td>
                       <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.mortgageBalance)}</td>
                       <td className="px-3 py-2 text-right text-gray-400 text-[10px]">detail ↗</td>
@@ -497,6 +504,7 @@ export function ResultsChart() {
                       <td className="px-3 py-2 text-right text-orange-700">{formatCZK(s.mortgagePayment)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
+                      <td className="px-3 py-2 text-right text-indigo-700">{formatCZK(s.assetsValue)}</td>
                       <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.mortgageBalance)}</td>
                       <td className="px-3 py-2 text-right text-gray-400 text-[10px]">detail ↗</td>

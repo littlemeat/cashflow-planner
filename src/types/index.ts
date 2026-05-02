@@ -41,6 +41,16 @@ export interface Mortgage {
   }>;
 }
 
+export interface Asset {
+  id: string;
+  name: string;
+  purchaseValue: number;          // total value at acquisition (e.g. 8 200 000)
+  acquisitionMonth: number;       // month offset from plan start; 0 = exists from start
+  appreciationAnnual: number;     // e.g. 0.02 for 2 %/year
+  linkedExpenseId?: string;       // optional: one-off expense that paid for this
+  linkedMortgageId?: string;      // optional: mortgage tied to this property
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -49,6 +59,7 @@ export interface Plan {
   baseline: Baseline;
   events: CashflowEvent[];
   mortgages: Mortgage[];
+  assets: Asset[];
 }
 
 export interface MonthlySnapshot {
@@ -63,7 +74,8 @@ export interface MonthlySnapshot {
   cashAccount: number;
   investmentsBalance: number;
   mortgageBalance: number;             // remaining principal across all mortgages
-  netWorth: number;                    // cash + investments - mortgageBalance
+  assetsValue: number;                 // sum of all asset values this month
+  netWorth: number;                    // cash + investments + assetsValue - mortgageBalance
   runwayMonths: number;
   flags: string[];
 }
