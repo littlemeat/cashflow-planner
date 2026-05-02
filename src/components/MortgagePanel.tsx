@@ -9,6 +9,7 @@ export function MortgagePanel() {
   const { plan, addMortgage, updateMortgage, deleteMortgage } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
   const [editingMortgage, setEditingMortgage] = useState<Mortgage | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const startDate = plan.baseline.startDate;
 
@@ -40,18 +41,28 @@ export function MortgagePanel() {
   return (
     <div className="bg-white rounded-xl shadow p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Hypotéky</h2>
         <button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
         >
-          + Přidat hypotéku
+          <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          Hypotéky
         </button>
+        {!collapsed && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+          >
+            + Přidat hypotéku
+          </button>
+        )}
       </div>
 
-      {plan.mortgages.length === 0 ? (
+      {!collapsed && plan.mortgages.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-6">Žádné hypotéky.</p>
-      ) : (
+      ) : !collapsed ? (
         <div className="space-y-4">
           {plan.mortgages.map((mortgage) => {
             const monthlyPayment = getInitialPayment(mortgage);
@@ -147,6 +158,8 @@ export function MortgagePanel() {
           })}
         </div>
       )}
+
+      ) : null}
 
       {showForm && (
         <MortgageForm onSave={handleAdd} onCancel={() => setShowForm(false)} />

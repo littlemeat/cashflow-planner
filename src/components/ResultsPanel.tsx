@@ -277,7 +277,7 @@ function Th({ children, tip }: { children: React.ReactNode; tip: string }) {
 export function ResultsChart() {
   const { plan, snapshots } = usePlanStore();
   const [showTable, setShowTable] = useState(false);
-  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly");
+  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly"); // yearly is default
   const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(() => loadVisibleSeries());
   const [detailMonth, setDetailMonth] = useState<number | null>(null);
 
@@ -396,7 +396,7 @@ export function ResultsChart() {
       </div>
 
       {showTable ? (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-clip rounded-lg border border-gray-200">
           <table className="min-w-[480px] w-full text-xs text-gray-700">
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px]">
               <tr>

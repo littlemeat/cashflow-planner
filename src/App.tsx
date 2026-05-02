@@ -1,5 +1,5 @@
 // Main application layout with export/import/reset controls
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { usePlanStore } from "./store/usePlanStore";
 import { Plan } from "./types";
 import { BaselinePanel } from "./components/BaselinePanel";
@@ -10,6 +10,7 @@ import { formatYearMonth } from "./lib/formatters";
 
 export default function App() {
   const { plan, importPlan, resetToSeed, history, undo } = usePlanStore();
+  const [baselineCollapsed, setBaselineCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canUndo = history.length > 0;
 
@@ -137,10 +138,22 @@ export default function App() {
         <ResultsSummary />
 
         {/* Middle row: Baseline + Events+Mortgages */}
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
-          <aside className="min-w-0">
-            <BaselinePanel />
-          </aside>
+        <div className={`grid grid-cols-1 ${baselineCollapsed ? "" : "lg:grid-cols-[300px_1fr]"} gap-6 items-start`}>
+          {baselineCollapsed ? (
+            <button
+              onClick={() => setBaselineCollapsed(false)}
+              className="hidden lg:flex items-center gap-2 text-xs text-gray-500 hover:text-blue-600 font-medium border border-dashed border-gray-300 rounded-xl px-3 py-2 transition-colors w-fit"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Nastavení
+            </button>
+          ) : (
+            <aside className="min-w-0">
+              <BaselinePanel onCollapse={() => setBaselineCollapsed(true)} />
+            </aside>
+          )}
           <div className="space-y-6 min-w-0">
             <EventsPanel />
             <MortgagePanel />

@@ -4,7 +4,7 @@ import { usePlanStore } from "../store/usePlanStore";
 import { Baseline } from "../types";
 import { AmountInput } from "./AmountInput";
 
-export function BaselinePanel() {
+export function BaselinePanel({ onCollapse }: { onCollapse?: () => void }) {
   const { plan, setBaseline } = usePlanStore();
   const [form, setForm] = useState<Baseline>(plan.baseline);
   const [saved, setSaved] = useState(false);
@@ -31,7 +31,16 @@ export function BaselinePanel() {
 
   return (
     <div className="bg-white rounded-xl shadow p-5 space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">Počáteční nastavení</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800">Počáteční nastavení</h2>
+        {onCollapse && (
+          <button onClick={onCollapse} className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Skrýt" aria-label="Skrýt panel">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+      </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Start date */}
         <div>
