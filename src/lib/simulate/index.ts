@@ -24,6 +24,7 @@ export interface MonthDetail {
   mortgageInterest: number;
   mortgagePrincipal: number;
   netCashflow: number;
+  investedThisMonth: number;  // surplus transferred to investments this month
   cashAccount: number;
   investmentsBalance: number;
   contributions: EventContribution[];  // per-event breakdown
@@ -111,6 +112,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     mortgageInterest: 0,
     mortgagePrincipal: 0,
     netCashflow: 0,
+    investedThisMonth: 0,
     cashAccount: 0,
     investmentsBalance: 0,
     contributions: [],
@@ -158,12 +160,11 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
         ? recentExpenses.reduce((a, b) => a + b, 0) / recentExpenses.length
         : 0;
 
-    const safetyBuffer = baseline.safetyBufferMonths * avgExpenses;
-
-    if (cashAccount > safetyBuffer) {
-      const excess = cashAccount - safetyBuffer;
-      investmentsBalance += excess;
-      cashAccount -= excess;
+    // Only this month's surplus goes to investments — never sweep accumulated cash
+    const investedThisMonth = netCashflow > 0 ? netCashflow : 0;
+    if (investedThisMonth > 0) {
+      investmentsBalance += investedThisMonth;
+      cashAccount -= investedThisMonth;
     }
 
     if (cashAccount < 0 && investmentsBalance > 0) {
@@ -194,6 +195,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
         mortgageInterest: totalInterestPortion,
         mortgagePrincipal: totalPrincipalPortion,
         netCashflow,
+        investedThisMonth,
         cashAccount,
         investmentsBalance,
         contributions,
@@ -262,7 +264,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
     // ── Step 4: Apply to accounts ────────────────────────────────────────────
     cashAccount += netCashflow;
 
-    // Track recent expenses for safety buffer
+    // Track recent expenses for runway calculation
     recentExpenses.push(expenses + totalMortgagePayment + totalInsurance);
     if (recentExpenses.length > 3) recentExpenses.shift();
 
@@ -271,14 +273,13 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
         ? recentExpenses.reduce((a, b) => a + b, 0) / recentExpenses.length
         : 0;
 
-    const safetyBuffer = baseline.safetyBufferMonths * avgExpenses;
-
-    if (cashAccount > safetyBuffer) {
-      const excess = cashAccount - safetyBuffer;
-      investmentsBalance += excess;
-      cashAccount -= excess;
+    // Only this month's surplus goes to investments — never sweep accumulated cash
+    if (netCashflow > 0) {
+      investmentsBalance += netCashflow;
+      cashAccount -= netCashflow;
     }
 
+    // If cash went negative (deficit month), withdraw from investments first
     if (cashAccount < 0 && investmentsBalance > 0) {
       const withdrawal = Math.min(-cashAccount, investmentsBalance);
       investmentsBalance -= withdrawal;

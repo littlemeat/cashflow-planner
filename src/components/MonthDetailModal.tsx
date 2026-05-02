@@ -134,6 +134,14 @@ export function MonthDetailModal({ plan, month, onClose }: MonthDetailModalProps
             </span>
           </div>
 
+          {/* Investment transfer */}
+          {detail.investedThisMonth > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">↗ Převod do investic</span>
+              <span className="font-medium text-green-700">{formatCZK(detail.investedThisMonth)}</span>
+            </div>
+          )}
+
           {/* Mortgage breakdown (if any) */}
           {detail.mortgagePayment > 0 && (
             <div className="bg-orange-50 rounded-lg px-3 py-2 text-xs text-gray-600 space-y-1">

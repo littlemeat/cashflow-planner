@@ -29,10 +29,10 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
 // ── Test 1: Simple income/expense cash growth ─────────────────────────────────
 
 describe("simulate — simple income/expense", () => {
-  it("cashAccount grows by 20k/month for first 3 months", () => {
-    // Use safetyBufferMonths=12 so the safety buffer (12 * 30000 = 360000) is
-    // large enough that the monthly surplus (20k) stays in the cash account rather
-    // than being swept to investments.
+  it("monthly surplus goes to investments; cashAccount stays at starting balance", () => {
+    // New behavior: only the monthly surplus (income - expenses) is transferred
+    // to investments each month. The existing cash balance is never swept.
+    // Starting cash = 0, surplus = 20k/month → cashAccount stays 0, investments grow.
     const plan = makePlan({
       baseline: {
         startDate: "2026-01",
@@ -68,12 +68,14 @@ describe("simulate — simple income/expense", () => {
 
     const snapshots = simulate(plan);
 
-    // Month 0: 0 + 20000 = 20000 (buffer = 12 * 30000 = 360000, cash < buffer → stays)
-    expect(snapshots[0]?.cashAccount).toBeCloseTo(20000, 0);
-    // Month 1: 20000 + 20000 = 40000
-    expect(snapshots[1]?.cashAccount).toBeCloseTo(40000, 0);
-    // Month 2: 40000 + 20000 = 60000
-    expect(snapshots[2]?.cashAccount).toBeCloseTo(60000, 0);
+    // Surplus (20k) goes to investments each month; cash stays at 0
+    expect(snapshots[0]?.cashAccount).toBeCloseTo(0, 0);
+    expect(snapshots[1]?.cashAccount).toBeCloseTo(0, 0);
+    expect(snapshots[2]?.cashAccount).toBeCloseTo(0, 0);
+    // Investments accumulate the surplus (yield=0, so exactly 20k * months)
+    expect(snapshots[0]?.investmentsBalance).toBeCloseTo(20000, 0);
+    expect(snapshots[1]?.investmentsBalance).toBeCloseTo(40000, 0);
+    expect(snapshots[2]?.investmentsBalance).toBeCloseTo(60000, 0);
   });
 });
 
