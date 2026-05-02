@@ -250,6 +250,28 @@ function KpiCard({ label, value, color, bg, tooltip }: { label: string; value: s
   );
 }
 
+// ── Table header cell with hover tooltip ─────────────────────────────────────
+
+function Th({ children, tip }: { children: React.ReactNode; tip: string }) {
+  return (
+    <th className="px-3 py-2 text-right">
+      <span className="inline-flex items-center justify-end gap-1">
+        {children}
+        <span className="relative group">
+          <svg className="w-3 h-3 text-gray-400 cursor-help flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <circle cx="12" cy="12" r="10" strokeWidth="2" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01" />
+          </svg>
+          <span className="pointer-events-none absolute bottom-full right-0 mb-2 w-56 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal leading-relaxed font-normal normal-case tracking-normal">
+            {tip}
+            <span className="absolute top-full right-3 border-4 border-transparent border-t-gray-800" />
+          </span>
+        </span>
+      </span>
+    </th>
+  );
+}
+
 // ── ResultsChart: full-width chart + table toggle + series toggle ─────────────
 
 export function ResultsChart() {
@@ -379,13 +401,13 @@ export function ResultsChart() {
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px]">
               <tr>
                 <th className="px-3 py-2 text-left">{tableMode === "monthly" ? "Měsíc" : "Rok"}</th>
-                <th className="px-3 py-2 text-right">Příjmy</th>
-                <th className="px-3 py-2 text-right">Výdaje</th>
-                <th className="px-3 py-2 text-right">Splátka</th>
-                <th className="px-3 py-2 text-right">Hotovost</th>
-                <th className="px-3 py-2 text-right">Investice</th>
-                <th className="px-3 py-2 text-right">Čisté jmění</th>
-                <th className="px-3 py-2 text-right">Hypotéka</th>
+                <Th tip="Součet všech příjmů (platy, pronájmy atd.) za daný měsíc/rok.">Příjmy</Th>
+                <Th tip="Součet výdajů za daný měsíc/rok — bez splátky hypotéky.">Výdaje</Th>
+                <Th tip="Měsíční splátka hypotéky (jistina + úrok + pojistné). Nezahrnuje mimořádné splátky.">Splátka</Th>
+                <Th tip="Zůstatek na běžném účtu na konci měsíce — po výdajích a přesunu přebytku do investic.">Hotovost</Th>
+                <Th tip="Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem.">Investice</Th>
+                <Th tip="Čisté jmění = hotovost + investice − zbývající jistina hypotéky.">Čisté jmění</Th>
+                <Th tip="Zbývající jistina hypotéky na konci měsíce — klesá s každou splátkou.">Hypotéka</Th>
                 <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>

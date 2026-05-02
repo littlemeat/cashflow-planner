@@ -431,22 +431,25 @@ export function MortgageForm({ initial, onSave, onCancel }: MortgageFormProps) {
                 />
               </div>
 
-              {/* Term */}
+              {/* Term — entered in years, stored as months */}
               <div>
-                <label htmlFor="mortgage-termMonths" className="block text-sm font-medium text-gray-700 mb-1">
-                  Délka (měsíce)
+                <label htmlFor="mortgage-termYears" className="block text-sm font-medium text-gray-700 mb-1">
+                  Délka (roky)
                 </label>
                 <input
-                  id="mortgage-termMonths"
+                  id="mortgage-termYears"
                   type="number"
-                  name="termMonths"
-                  value={form.termMonths}
-                  onChange={handleChange}
+                  value={Math.round(form.termMonths / 12)}
+                  onChange={(e) => {
+                    const years = Math.max(1, parseInt(e.target.value) || 1);
+                    setForm((prev) => ({ ...prev, termMonths: years * 12 }));
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min={1}
-                  max={600}
-                  step={12}
+                  max={50}
+                  step={1}
                 />
+                <p className="text-xs text-gray-400 mt-0.5">= {form.termMonths} měsíců</p>
               </div>
 
               {/* Insurance */}

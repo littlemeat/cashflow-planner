@@ -294,8 +294,9 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
     investmentsBalance *= Math.pow(1 + baseline.investmentsYieldAnnual, 1 / 12);
 
     // ── Step 6: Record snapshot ───────────────────────────────────────────────
+    // Only count mortgages that have already started — not future ones
     const mortgageBalance = mortgageStates.reduce(
-      (sum, s) => sum + s.remainingPrincipal,
+      (sum, s, i) => sum + (mortgages[i]!.startMonth <= m ? s.remainingPrincipal : 0),
       0
     );
     const netWorth = cashAccount + investmentsBalance - mortgageBalance;

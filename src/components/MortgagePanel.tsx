@@ -130,11 +130,11 @@ export function MortgagePanel() {
                   </div>
                 </div>
 
-                {/* Extra payments summary */}
-                {mortgage.extraPayments && mortgage.extraPayments.length > 0 && (
+                {/* Extra payments summary — skip zero-amount entries */}
+                {mortgage.extraPayments && mortgage.extraPayments.filter(ep => ep.amount > 0).length > 0 && (
                   <div className="text-sm text-gray-600 space-y-0.5">
                     <span className="font-medium">Mimořádné splátky:</span>
-                    {mortgage.extraPayments.map((ep) => (
+                    {mortgage.extraPayments.filter(ep => ep.amount > 0).map((ep) => (
                       <div key={ep.id} className="pl-2 text-xs text-gray-500">
                         {formatCZK(ep.amount)} v {formatYearMonth(addMonths(startDate, ep.month))}
                         {" · "}{ep.strategy === "shorten-term" ? "zkrácení doby" : "snížení splátky"}

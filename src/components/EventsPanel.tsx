@@ -96,8 +96,17 @@ export function EventsPanel() {
   }
 
   function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    const active = sortField === field;
+    return (
+      <span className="inline-flex flex-col ml-1 gap-[1px]">
+        <svg className={`w-2 h-2 ${active && sortDir === "asc" ? "text-blue-600" : "text-gray-300"}`} viewBox="0 0 8 5" fill="currentColor">
+          <path d="M4 0L8 5H0z" />
+        </svg>
+        <svg className={`w-2 h-2 ${active && sortDir === "desc" ? "text-blue-600" : "text-gray-300"}`} viewBox="0 0 8 5" fill="currentColor">
+          <path d="M4 5L0 0h8z" />
+        </svg>
+      </span>
+    );
   }
 
   function thClass(field: SortField) {
@@ -214,7 +223,10 @@ function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventR
           {event.name}
           {event.notes && (
             <span className="relative group ml-1 flex-shrink-0">
-              <span className="text-blue-400 text-xs cursor-default select-none">ℹ</span>
+              <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01" />
+              </svg>
               <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal leading-relaxed">
                 {event.notes}
                 <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
