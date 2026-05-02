@@ -36,6 +36,16 @@ export const SERIES: SeriesConfig[] = [
 const DEFAULT_VISIBLE: SeriesKey[] = ["cashAccount", "investmentsBalance", "netWorth", "mortgageBalance"];
 
 const SERIES_STORAGE_KEY = "cashflow-planner-visible-series";
+const TABLE_VIEW_KEY = "cashflow-planner-show-table";
+
+function loadShowTable(): boolean {
+  try {
+    const raw = localStorage.getItem(TABLE_VIEW_KEY);
+    return raw === null ? true : raw === "true"; // default = table
+  } catch {
+    return true;
+  }
+}
 
 function loadVisibleSeries(): Set<SeriesKey> {
   try {
@@ -105,7 +115,10 @@ function CustomTooltip({ active, payload, label, startDate }: CustomTooltipProps
 
 interface TableRow {
   year: number;
-  snapshot: MonthlySnapshot;
+  snapshot: MonthlySnapshot; // end-of-year balance
+  annualIncome: number;
+  annualExpenses: number;
+  annualMortgagePayment: number;
 }
 
 function buildYearlyTable(snapshots: MonthlySnapshot[], startDate: string): TableRow[] {
@@ -116,11 +129,17 @@ function buildYearlyTable(snapshots: MonthlySnapshot[], startDate: string): Tabl
   const maxMonth = snapshots.length - 1;
   let yearIdx = 0;
   while (true) {
+    const startOfYear = yearIdx * 12;
     const endOfYearMonth = yearIdx * 12 + 11;
     const pickMonth = Math.min(endOfYearMonth, maxMonth);
     const snap = snapshots[pickMonth];
     if (!snap) break;
-    rows.push({ year: baseYear + yearIdx, snapshot: snap });
+    // Sum income/expenses/mortgage across all months of this year
+    const yearSnaps = snapshots.slice(startOfYear, pickMonth + 1);
+    const annualIncome = yearSnaps.reduce((sum, s) => sum + s.income, 0);
+    const annualExpenses = yearSnaps.reduce((sum, s) => sum + s.expenses, 0);
+    const annualMortgagePayment = yearSnaps.reduce((sum, s) => sum + s.mortgagePayment, 0);
+    rows.push({ year: baseYear + yearIdx, snapshot: snap, annualIncome, annualExpenses, annualMortgagePayment });
     if (pickMonth >= maxMonth) break;
     yearIdx++;
   }
@@ -276,12 +295,17 @@ function Th({ children, tip }: { children: React.ReactNode; tip: string }) {
 
 export function ResultsChart() {
   const { plan, snapshots } = usePlanStore();
-  const [showTable, setShowTable] = useState(false);
-  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly"); // yearly is default
+  const [showTable, setShowTable] = useState<boolean>(() => loadShowTable());
+  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly");
   const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(() => loadVisibleSeries());
   const [detailMonth, setDetailMonth] = useState<number | null>(null);
 
-  // Persist series visibility to localStorage so the choice survives page reloads
+  // Persist show/hide table choice
+  useEffect(() => {
+    localStorage.setItem(TABLE_VIEW_KEY, String(showTable));
+  }, [showTable]);
+
+  // Persist series visibility
   useEffect(() => {
     localStorage.setItem(SERIES_STORAGE_KEY, JSON.stringify([...visibleSeries]));
   }, [visibleSeries]);
@@ -401,19 +425,29 @@ export function ResultsChart() {
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px]">
               <tr>
                 <th className="px-3 py-2 text-left">{tableMode === "monthly" ? "Měsíc" : "Rok"}</th>
-                <Th tip="Součet všech příjmů (platy, pronájmy atd.) za daný měsíc/rok.">Příjmy</Th>
-                <Th tip="Součet výdajů za daný měsíc/rok — bez splátky hypotéky.">Výdaje</Th>
-                <Th tip="Měsíční splátka hypotéky (jistina + úrok + pojistné). Nezahrnuje mimořádné splátky.">Splátka</Th>
-                <Th tip="Zůstatek na běžném účtu na konci měsíce — po výdajích a přesunu přebytku do investic.">Hotovost</Th>
-                <Th tip="Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem.">Investice</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Celkové příjmy za daný rok — součet všech měsíců (platy, pronájmy, dávky atd.)."
+                  : "Součet všech příjmů v daném měsíci (platy, pronájmy, dávky atd.)."}>Příjmy</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Celkové výdaje za daný rok — součet všech měsíců. Nezahrnuje splátku hypotéky."
+                  : "Součet výdajů v daném měsíci — bez splátky hypotéky."}>Výdaje</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Celková splátka hypotéky za rok (jistina + úrok + pojistné). Nezahrnuje mimořádné splátky."
+                  : "Splátka hypotéky v daném měsíci (jistina + úrok + pojistné)."}>Splátka hypo</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Zůstatek na běžném účtu na konci roku. Přebytek nad bezpečnostní rezervu se průběžně přesouvá do investic — proto může být hotovost nižší, než čekáš."
+                  : "Zůstatek na běžném účtu na konci měsíce. Přebytek nad bezpečnostní rezervu se přesouvá do investic."}>Hotovost</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Zůstatek investičního portfolia na konci roku. Sem automaticky putuje veškerý přebytek hotovosti nad bezpečnostní rezervu. Roste i o výnos (nastavený v Počátečním nastavení)."
+                  : "Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem."}>Investice</Th>
                 <Th tip="Čisté jmění = hotovost + investice − zbývající jistina hypotéky.">Čisté jmění</Th>
-                <Th tip="Zbývající jistina hypotéky na konci měsíce — klesá s každou splátkou.">Hypotéka</Th>
+                <Th tip="Zbývající jistina hypotéky na konci období — klesá s každou splátkou.">Hypo zůstatek</Th>
                 <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {tableMode === "yearly"
-                ? yearlyRows.map(({ year, snapshot: s }) => (
+                ? yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment }) => (
                     <tr
                       key={year}
                       onClick={() => setDetailMonth(s.month)}
@@ -424,9 +458,9 @@ export function ResultsChart() {
                       }`}
                     >
                       <td className="px-3 py-2 font-medium">{year}</td>
-                      <td className="px-3 py-2 text-right text-green-700">{formatCZK(s.income)}</td>
-                      <td className="px-3 py-2 text-right text-red-600">{formatCZK(s.expenses)}</td>
-                      <td className="px-3 py-2 text-right text-orange-700">{formatCZK(s.mortgagePayment)}</td>
+                      <td className="px-3 py-2 text-right text-green-700">{formatCZK(annualIncome)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{formatCZK(annualExpenses)}</td>
+                      <td className="px-3 py-2 text-right text-orange-700">{formatCZK(annualMortgagePayment)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
                       <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
                       <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
