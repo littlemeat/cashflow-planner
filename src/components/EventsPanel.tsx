@@ -1,5 +1,22 @@
-// Events CRUD panel with sortable table and collapsible preset groups
-import { useState, useMemo } from "react";
+// Events CRUD panel with drag-and-drop ordering
+import { useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { usePlanStore } from "../store/usePlanStore";
 import { CashflowEvent } from "../types";
 import { EventForm } from "./EventForm";
@@ -15,53 +32,52 @@ import {
 type SortField = "name" | "category" | "startMonth" | "amount";
 type SortDir = "asc" | "desc";
 
-const GROUP_COLORS = [
-  "bg-violet-400",
-  "bg-emerald-400",
-  "bg-amber-400",
-  "bg-sky-400",
-  "bg-rose-400",
-  "bg-fuchsia-400",
-];
-
 export function EventsPanel() {
-  const { plan, addEvent, updateEvent, deleteEvent } = usePlanStore();
+  const { plan, addEvent, updateEvent, deleteEvent, reorderEvents } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CashflowEvent | null>(null);
-  const [sortField, setSortField] = useState<SortField>("startMonth");
+  const [sortField, setSortField] = useState<SortField | null>(null); // null = stored order
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const startDate = plan.baseline.startDate;
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // null sortField → natural stored order; third click on same column resets to natural
   function handleSort(field: SortField) {
-    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortField(field); setSortDir("asc"); }
-  }
-
-  function toggleGroup(groupId: string) {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
-  }
-
-  function handleDeleteGroup(_groupId: string, events: CashflowEvent[]) {
-    if (window.confirm(`Smazat celou skupinu (${events.length} položek)?`)) {
-      events.forEach((e) => deleteEvent(e.id));
+    if (sortField === field) {
+      if (sortDir === "asc") setSortDir("desc");
+      else { setSortField(null); setSortDir("asc"); }
+    } else {
+      setSortField(field);
+      setSortDir("asc");
     }
   }
 
-  const sortedEvents = [...plan.events].sort((a, b) => {
-    let cmp = 0;
-    if (sortField === "name") cmp = a.name.localeCompare(b.name, "cs");
-    else if (sortField === "category") cmp = a.category.localeCompare(b.category);
-    else if (sortField === "startMonth") cmp = a.startMonth - b.startMonth;
-    else if (sortField === "amount") cmp = a.amount - b.amount;
-    return sortDir === "asc" ? cmp : -cmp;
-  });
+  const displayedEvents: CashflowEvent[] = sortField
+    ? [...plan.events].sort((a, b) => {
+        let cmp = 0;
+        if (sortField === "name") cmp = a.name.localeCompare(b.name, "cs");
+        else if (sortField === "category") cmp = a.category.localeCompare(b.category);
+        else if (sortField === "startMonth") cmp = a.startMonth - b.startMonth;
+        else if (sortField === "amount") cmp = a.amount - b.amount;
+        return sortDir === "asc" ? cmp : -cmp;
+      })
+    : plan.events;
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = displayedEvents.findIndex((e) => e.id === active.id);
+    const newIndex = displayedEvents.findIndex((e) => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(displayedEvents, oldIndex, newIndex);
+    reorderEvents(reordered.map((e) => e.id));
+    setSortField(null); // switch back to natural order so result is visible
+  }
 
   function handleAdd(data: Omit<CashflowEvent, "id">) {
     addEvent(data);
@@ -85,84 +101,9 @@ export function EventsPanel() {
   }
 
   function thClass(field: SortField) {
-    return `px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700 select-none ${
-      sortField === field ? "text-blue-600" : ""
+    return `px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide cursor-pointer hover:text-gray-700 select-none ${
+      sortField === field ? "text-blue-600" : "text-gray-500"
     }`;
-  }
-
-  // Build stable color map for preset groups
-  const presetGroupColors = useMemo(() => {
-    const map: Record<string, string> = {};
-    let idx = 0;
-    for (const ev of plan.events) {
-      if (ev.presetGroup && !(ev.presetGroup in map)) {
-        map[ev.presetGroup] = GROUP_COLORS[idx % GROUP_COLORS.length]!;
-        idx++;
-      }
-    }
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan.events]);
-
-  // Separate ungrouped and grouped events
-  const ungroupedEvents = sortedEvents.filter((e) => !e.presetGroup);
-  const groupedEvents = sortedEvents.filter((e) => e.presetGroup);
-
-  // Collect groups sorted by earliest startMonth
-  const groupMap = new Map<string, CashflowEvent[]>();
-  for (const ev of groupedEvents) {
-    const gid = ev.presetGroup!;
-    if (!groupMap.has(gid)) groupMap.set(gid, []);
-    groupMap.get(gid)!.push(ev);
-  }
-  const sortedGroups = [...groupMap.entries()].sort(
-    ([, a], [, b]) => Math.min(...a.map((e) => e.startMonth)) - Math.min(...b.map((e) => e.startMonth))
-  );
-
-  const COL_COUNT = 8;
-
-  function EventRow({ event }: { event: CashflowEvent; indent?: boolean }) {
-    return (
-      <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-        <td className="px-3 py-2 font-medium text-gray-800">
-          <span className="flex items-center gap-1.5">
-            {event.presetGroup && (
-              <span
-                className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${presetGroupColors[event.presetGroup] ?? "bg-gray-400"}`}
-              />
-            )}
-            {event.name}
-            {event.notes && (
-              <span className="ml-1 text-gray-400 text-xs" title={event.notes}>ℹ</span>
-            )}
-          </span>
-        </td>
-        <td className="px-3 py-2">
-          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-            event.category === "income" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-          }`}>
-            {formatCategory(event.category)}
-          </span>
-        </td>
-        <td className="px-3 py-2 text-right font-mono text-gray-700">{formatCZK(event.amount)}</td>
-        <td className="px-3 py-2 text-gray-600">{formatFrequency(event.frequency)}</td>
-        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-          {formatYearMonth(addMonths(startDate, event.startMonth))}
-        </td>
-        <td className="hidden sm:table-cell px-3 py-2 text-gray-600 whitespace-nowrap">
-          {event.endMonth != null ? formatYearMonth(addMonths(startDate, event.endMonth)) : "—"}
-        </td>
-        <td className="hidden sm:table-cell px-3 py-2 text-gray-600">
-          {event.annualGrowthPct !== 0 ? `${(event.annualGrowthPct * 100).toFixed(1)} %` : "—"}
-        </td>
-        <td className="px-3 py-2">
-          <div className="flex gap-2">
-            <button onClick={() => setEditingEvent(event)} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Upravit</button>
-            <button onClick={() => handleDelete(event.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Smazat</button>
-          </div>
-        </td>
-      </tr>
-    );
   }
 
   return (
@@ -183,77 +124,38 @@ export function EventsPanel() {
       {plan.events.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-6">Žádné položky. Přidejte první.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
-                <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
-                <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekvence</th>
-                <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
-                <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Non-grouped events */}
-              {ungroupedEvents.map((event) => (
-                <EventRow key={event.id} event={event} />
-              ))}
-
-              {/* Grouped events with collapsible headers */}
-              {sortedGroups.map(([groupId, events]) => {
-                const color = presetGroupColors[groupId] ?? "bg-gray-400";
-                const isCollapsed = collapsedGroups.has(groupId);
-                const groupName = events[0]?.name ?? "Skupina";
-                const earliestStart = Math.min(...events.map((e) => e.startMonth));
-                const latestEnd = events.every((e) => e.endMonth === null)
-                  ? null
-                  : Math.max(...events.map((e) => e.endMonth ?? e.startMonth));
-
-                return (
-                  <>
-                    {/* Group header row */}
-                    <tr key={`group-${groupId}`} className="bg-gray-50 border-t border-gray-200">
-                      <td colSpan={COL_COUNT} className="px-3 py-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${color}`} />
-                          <span className="text-xs font-semibold text-gray-700">{groupName}</span>
-                          <span className="text-xs text-gray-400">{events.length} položek</span>
-                          <span className="text-xs text-gray-400">
-                            {formatYearMonth(addMonths(startDate, earliestStart))}
-                            {latestEnd !== null ? ` → ${formatYearMonth(addMonths(startDate, latestEnd))}` : " →"}
-                          </span>
-                          <div className="ml-auto flex items-center gap-3">
-                            <button
-                              onClick={() => handleDeleteGroup(groupId, events)}
-                              className="text-xs text-red-400 hover:text-red-600"
-                            >
-                              Smazat skupinu
-                            </button>
-                            <button
-                              onClick={() => toggleGroup(groupId)}
-                              className="text-xs text-blue-500 hover:text-blue-700 font-medium"
-                            >
-                              {isCollapsed ? "▶ Zobrazit" : "▼ Skrýt"}
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Group event rows (when expanded) */}
-                    {!isCollapsed && events.map((event) => (
-                      <EventRow key={event.id} event={event} />
-                    ))}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="w-6 px-2 py-2" aria-label="Přetáhnout" />
+                  <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
+                  <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
+                  <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekv.</th>
+                  <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
+                  <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
+                  <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
+                </tr>
+              </thead>
+              <SortableContext items={displayedEvents.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+                <tbody>
+                  {displayedEvents.map((event) => (
+                    <SortableEventRow
+                      key={event.id}
+                      event={event}
+                      startDate={startDate}
+                      onEdit={() => setEditingEvent(event)}
+                      onDelete={() => handleDelete(event.id)}
+                    />
+                  ))}
+                </tbody>
+              </SortableContext>
+            </table>
+          </div>
+        </DndContext>
       )}
 
       {showForm && <EventForm onSave={handleAdd} onCancel={() => setShowForm(false)} />}
@@ -261,5 +163,90 @@ export function EventsPanel() {
         <EventForm initial={editingEvent} onSave={handleUpdate} onCancel={() => setEditingEvent(null)} />
       )}
     </div>
+  );
+}
+
+// ── Sortable row ──────────────────────────────────────────────────────────────
+
+interface SortableEventRowProps {
+  event: CashflowEvent;
+  startDate: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: event.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+    >
+      {/* Drag handle */}
+      <td
+        className="px-2 py-2 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+        aria-label="Přetáhnout pro změnu pořadí"
+      >
+        <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden>
+          <circle cx="3" cy="3" r="1.5" />
+          <circle cx="9" cy="3" r="1.5" />
+          <circle cx="3" cy="8" r="1.5" />
+          <circle cx="9" cy="8" r="1.5" />
+          <circle cx="3" cy="13" r="1.5" />
+          <circle cx="9" cy="13" r="1.5" />
+        </svg>
+      </td>
+
+      <td className="px-3 py-2 font-medium text-gray-800">
+        <span className="flex items-center gap-1.5">
+          {event.name}
+          {event.notes && (
+            <span className="relative group ml-1 flex-shrink-0">
+              <span className="text-blue-400 text-xs cursor-default select-none">ℹ</span>
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal leading-relaxed">
+                {event.notes}
+                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+              </span>
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="px-3 py-2">
+        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+          event.category === "income" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+        }`}>
+          {formatCategory(event.category)}
+        </span>
+      </td>
+      <td className="px-3 py-2 text-right font-mono text-gray-700">{formatCZK(event.amount)}</td>
+      <td className="px-3 py-2 text-gray-600">{formatFrequency(event.frequency)}</td>
+      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+        {formatYearMonth(addMonths(startDate, event.startMonth))}
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2 text-gray-600 whitespace-nowrap">
+        {event.endMonth != null ? formatYearMonth(addMonths(startDate, event.endMonth)) : "—"}
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2 text-gray-600">
+        {event.annualGrowthPct !== 0 ? `${(event.annualGrowthPct * 100).toFixed(1)} %` : "—"}
+      </td>
+      <td className="px-3 py-2">
+        <div className="flex gap-2">
+          <button onClick={onEdit} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Upravit</button>
+          <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs font-medium">Smazat</button>
+        </div>
+      </td>
+    </tr>
   );
 }

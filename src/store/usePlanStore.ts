@@ -104,6 +104,7 @@ interface PlanStore {
   deleteMortgage: (id: string) => void;
   importPlan: (plan: Plan) => void;
   resetToSeed: () => void;
+  reorderEvents: (orderedIds: string[]) => void;
 }
 
 function pushHistory(state: { history: Plan[]; plan: Plan }): Plan[] {
@@ -209,5 +210,16 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       const seed = createSeedPlan();
       saveToStorage(seed);
       return { plan: seed, snapshots: simulate(seed), history: [] };
+    }),
+
+  reorderEvents: (orderedIds) =>
+    set((state) => {
+      const idToEvent = new Map(state.plan.events.map((e) => [e.id, e]));
+      const reordered = orderedIds
+        .map((id) => idToEvent.get(id))
+        .filter((e): e is CashflowEvent => e !== undefined);
+      const updated = touchPlan({ ...state.plan, events: reordered });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
     }),
 }));

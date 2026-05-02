@@ -255,6 +255,7 @@ function KpiCard({ label, value, color, bg, tooltip }: { label: string; value: s
 export function ResultsChart() {
   const { plan, snapshots } = usePlanStore();
   const [showTable, setShowTable] = useState(false);
+  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly");
   const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(() => loadVisibleSeries());
   const [detailMonth, setDetailMonth] = useState<number | null>(null);
 
@@ -347,6 +348,22 @@ export function ResultsChart() {
               {s.label}
             </button>
           ))}
+          {showTable && (
+            <>
+              <button
+                onClick={() => setTableMode("yearly")}
+                className={`text-xs font-medium rounded-full px-3 py-1 border transition-colors ${tableMode === "yearly" ? "bg-gray-800 text-white border-gray-800" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+              >
+                Ročně
+              </button>
+              <button
+                onClick={() => setTableMode("monthly")}
+                className={`text-xs font-medium rounded-full px-3 py-1 border transition-colors ${tableMode === "monthly" ? "bg-gray-800 text-white border-gray-800" : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"}`}
+              >
+                Měsíčně
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowTable((t) => !t)}
             className="text-xs font-medium rounded-full px-3 py-1 border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
@@ -361,7 +378,7 @@ export function ResultsChart() {
           <table className="min-w-[480px] w-full text-xs text-gray-700">
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px]">
               <tr>
-                <th className="px-3 py-2 text-left">Rok</th>
+                <th className="px-3 py-2 text-left">{tableMode === "monthly" ? "Měsíc" : "Rok"}</th>
                 <th className="px-3 py-2 text-right">Příjmy</th>
                 <th className="px-3 py-2 text-right">Výdaje</th>
                 <th className="px-3 py-2 text-right">Splátka</th>
@@ -373,27 +390,50 @@ export function ResultsChart() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {yearlyRows.map(({ year, snapshot: s }) => (
-                <tr
-                  key={year}
-                  onClick={() => setDetailMonth(s.month)}
-                  className={`cursor-pointer ${
-                    s.flags.includes("cash-negative")
-                      ? "bg-red-50 hover:bg-red-100"
-                      : "hover:bg-violet-50"
-                  }`}
-                >
-                  <td className="px-3 py-2 font-medium">{year}</td>
-                  <td className="px-3 py-2 text-right text-green-700">{formatCZK(s.income)}</td>
-                  <td className="px-3 py-2 text-right text-red-600">{formatCZK(s.expenses)}</td>
-                  <td className="px-3 py-2 text-right text-orange-700">{formatCZK(s.mortgagePayment)}</td>
-                  <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
-                  <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
-                  <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
-                  <td className="px-3 py-2 text-right">{formatCZK(s.mortgageBalance)}</td>
-                  <td className="px-3 py-2 text-right text-gray-400 text-[10px]">detail ↗</td>
-                </tr>
-              ))}
+              {tableMode === "yearly"
+                ? yearlyRows.map(({ year, snapshot: s }) => (
+                    <tr
+                      key={year}
+                      onClick={() => setDetailMonth(s.month)}
+                      className={`cursor-pointer ${
+                        s.flags.includes("cash-negative")
+                          ? "bg-red-50 hover:bg-red-100"
+                          : "hover:bg-violet-50"
+                      }`}
+                    >
+                      <td className="px-3 py-2 font-medium">{year}</td>
+                      <td className="px-3 py-2 text-right text-green-700">{formatCZK(s.income)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{formatCZK(s.expenses)}</td>
+                      <td className="px-3 py-2 text-right text-orange-700">{formatCZK(s.mortgagePayment)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
+                      <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.mortgageBalance)}</td>
+                      <td className="px-3 py-2 text-right text-gray-400 text-[10px]">detail ↗</td>
+                    </tr>
+                  ))
+                : snapshots.map((s) => (
+                    <tr
+                      key={s.month}
+                      onClick={() => setDetailMonth(s.month)}
+                      className={`cursor-pointer ${
+                        s.flags.includes("cash-negative")
+                          ? "bg-red-50 hover:bg-red-100"
+                          : "hover:bg-violet-50"
+                      }`}
+                    >
+                      <td className="px-3 py-2 font-medium">{s.date.replace("-", "/")}</td>
+                      <td className="px-3 py-2 text-right text-green-700">{formatCZK(s.income)}</td>
+                      <td className="px-3 py-2 text-right text-red-600">{formatCZK(s.expenses)}</td>
+                      <td className="px-3 py-2 text-right text-orange-700">{formatCZK(s.mortgagePayment)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.cashAccount)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.investmentsBalance)}</td>
+                      <td className="px-3 py-2 text-right text-purple-700 font-medium">{formatCZK(s.netWorth)}</td>
+                      <td className="px-3 py-2 text-right">{formatCZK(s.mortgageBalance)}</td>
+                      <td className="px-3 py-2 text-right text-gray-400 text-[10px]">detail ↗</td>
+                    </tr>
+                  ))
+              }
             </tbody>
           </table>
         </div>
