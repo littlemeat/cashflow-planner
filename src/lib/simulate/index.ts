@@ -25,6 +25,7 @@ export interface MonthDetail {
   mortgagePrincipal: number;
   netCashflow: number;
   investedThisMonth: number;  // surplus transferred to investments this month
+  investmentYield: number;    // actual CZK growth from yield this month
   cashAccount: number;
   investmentsBalance: number;
   contributions: EventContribution[];  // per-event breakdown
@@ -113,6 +114,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     mortgagePrincipal: 0,
     netCashflow: 0,
     investedThisMonth: 0,
+    investmentYield: 0,
     cashAccount: 0,
     investmentsBalance: 0,
     contributions: [],
@@ -178,7 +180,9 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
       flags.push("cash-negative");
     }
 
-    investmentsBalance *= Math.pow(1 + baseline.investmentsYieldAnnual, 1 / 12);
+    const monthlyGrowthFactor = Math.pow(1 + baseline.investmentsYieldAnnual, 1 / 12);
+    const investmentYield = investmentsBalance * (monthlyGrowthFactor - 1);
+    investmentsBalance *= monthlyGrowthFactor;
 
     const runwayMonths =
       avgExpenses > 0
@@ -196,6 +200,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
         mortgagePrincipal: totalPrincipalPortion,
         netCashflow,
         investedThisMonth,
+        investmentYield,
         cashAccount,
         investmentsBalance,
         contributions,
@@ -293,6 +298,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
 
     // ── Step 5: Investments grow ─────────────────────────────────────────────
     investmentsBalance *= Math.pow(1 + baseline.investmentsYieldAnnual, 1 / 12);
+    // (yield amount = investmentsBalance_before * (factor - 1); tracked in getMonthDetail)
 
     // ── Step 6: Record snapshot ───────────────────────────────────────────────
     // Only count mortgages that have already started — not future ones

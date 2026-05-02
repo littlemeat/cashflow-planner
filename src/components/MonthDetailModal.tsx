@@ -134,11 +134,22 @@ export function MonthDetailModal({ plan, month, onClose }: MonthDetailModalProps
             </span>
           </div>
 
-          {/* Investment transfer */}
-          {detail.investedThisMonth > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">↗ Převod do investic</span>
-              <span className="font-medium text-green-700">{formatCZK(detail.investedThisMonth)}</span>
+          {/* Investment transfer + yield */}
+          {(detail.investedThisMonth > 0 || detail.investmentYield > 0) && (
+            <div className="bg-green-50 rounded-lg px-3 py-2 text-xs text-gray-600 space-y-1">
+              <p className="font-medium text-green-700 mb-1">Investice</p>
+              {detail.investedThisMonth > 0 && (
+                <div className="flex justify-between">
+                  <span>Vloženo tento měsíc</span>
+                  <span className="font-medium">+{formatCZK(detail.investedThisMonth)}</span>
+                </div>
+              )}
+              {detail.investmentYield > 0 && (
+                <div className="flex justify-between">
+                  <span>Výnos z úročení</span>
+                  <span className="font-medium text-green-600">+{formatCZK(detail.investmentYield)}</span>
+                </div>
+              )}
             </div>
           )}
 
