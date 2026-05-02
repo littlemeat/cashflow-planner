@@ -379,7 +379,7 @@ export function ResultsChart() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-lg font-semibold text-gray-800">Přehled vývoje</h2>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Series toggles */}
+          {/* Series toggles (chart only) */}
           {!showTable && SERIES.map((s) => (
             <button
               key={s.key}
@@ -394,6 +394,7 @@ export function ResultsChart() {
               {s.label}
             </button>
           ))}
+          {/* Yearly / monthly toggle (table only) */}
           {showTable && (
             <>
               <button
@@ -427,7 +428,7 @@ export function ResultsChart() {
                 <th className="px-3 py-2 text-left">{tableMode === "monthly" ? "Měsíc" : "Rok"}</th>
                 <Th tip={tableMode === "yearly"
                   ? "Celkové příjmy za daný rok — součet všech měsíců (platy, pronájmy, dávky atd.)."
-                  : "Součet všech příjmů v daném měsíci (platy, pronájmy, dávky atd.)."}>Příjmy</Th>
+                  : "Součet příjmů v daném měsíci (platy, pronájmy, dávky atd.)."}>Příjmy</Th>
                 <Th tip={tableMode === "yearly"
                   ? "Celkové výdaje za daný rok — součet všech měsíců. Nezahrnuje splátku hypotéky."
                   : "Součet výdajů v daném měsíci — bez splátky hypotéky."}>Výdaje</Th>
@@ -435,17 +436,29 @@ export function ResultsChart() {
                   ? "Celková splátka hypotéky za rok (jistina + úrok + pojistné). Nezahrnuje mimořádné splátky."
                   : "Splátka hypotéky v daném měsíci (jistina + úrok + pojistné)."}>Splátka hypo</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Zůstatek na běžném účtu na konci roku. Přebytek nad bezpečnostní rezervu se průběžně přesouvá do investic — proto může být hotovost nižší, než čekáš."
+                  ? "Zůstatek na běžném účtu ke konci roku. Přebytek nad bezpečnostní rezervu se průběžně přesouvá do investic — proto může být hotovost nižší, než čekáš."
                   : "Zůstatek na běžném účtu na konci měsíce. Přebytek nad bezpečnostní rezervu se přesouvá do investic."}>Hotovost</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Zůstatek investičního portfolia na konci roku. Sem automaticky putuje veškerý přebytek hotovosti nad bezpečnostní rezervu. Roste i o výnos (nastavený v Počátečním nastavení)."
+                  ? "Zůstatek investičního portfolia ke konci roku. Sem automaticky putuje přebytek hotovosti nad bezpečnostní rezervu. Roste i o výnos (nastavený v Počátečním nastavení)."
                   : "Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem."}>Investice</Th>
                 <Th tip="Čisté jmění = hotovost + investice − zbývající jistina hypotéky.">Čisté jmění</Th>
-                <Th tip="Zbývající jistina hypotéky na konci období — klesá s každou splátkou.">Hypo zůstatek</Th>
+                <Th tip="Zbývající jistina hypotéky ke konci období — klesá s každou splátkou.">Hypo zůstatek</Th>
                 <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
+              {/* Initial state row — baseline values before simulation */}
+              <tr className="bg-gray-50 text-gray-500 italic">
+                <td className="px-3 py-2 font-medium not-italic text-gray-700">Počáteční stav</td>
+                <td className="px-3 py-2 text-right">—</td>
+                <td className="px-3 py-2 text-right">—</td>
+                <td className="px-3 py-2 text-right">—</td>
+                <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.cashAccount)}</td>
+                <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.investmentsBalance)}</td>
+                <td className="px-3 py-2 text-right text-purple-600 font-medium not-italic">{formatCZK(plan.baseline.cashAccount + plan.baseline.investmentsBalance)}</td>
+                <td className="px-3 py-2 text-right">—</td>
+                <td className="px-3 py-2"></td>
+              </tr>
               {tableMode === "yearly"
                 ? yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment }) => (
                     <tr
