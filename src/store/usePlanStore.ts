@@ -238,8 +238,9 @@ export const usePlanStore = create<PlanStore>()((set) => ({
 
   importPlan: (plan) =>
     set(() => {
-      saveToStorage(plan);
-      return { plan, snapshots: simulate(plan), history: [] };
+      const migrated = migratePlan(plan as unknown);
+      saveToStorage(migrated);
+      return { plan: migrated, snapshots: simulate(migrated), history: [] };
     }),
 
   resetToSeed: () =>
