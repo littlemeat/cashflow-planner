@@ -359,6 +359,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
       mortgageBalance,
       assetsValue,
       netWorth,
+      targetCash,
       runwayMonths,
       flags,
     });

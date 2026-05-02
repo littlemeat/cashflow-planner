@@ -199,13 +199,16 @@ export function ResultsSummary() {
           </div>
           <div className="flex flex-wrap gap-3">
             <KpiCard label="Čisté jmění" value={formatCZK(snap.netWorth)} color="text-purple-700" bg="bg-purple-50"
-              tooltip="Čisté jmění = hotovost + investice + majetek − zbývající jistina hypotéky." />
-            <KpiCard label="Hotovost" value={formatCZK(snap.cashAccount)} color="text-blue-700" bg="bg-blue-50" />
+              tooltip="Hotovost + Investice + Majetek − Hypo zůstatek. Pokud eviduješ hypotéku, ale nemáš přidanou nemovitost v Majetku, bude čisté jmění záporné — to je normální, chybí tam protiváha." />
+            <KpiCard label="Hotovost" value={formatCZK(snap.cashAccount)} color="text-blue-700" bg="bg-blue-50"
+              subtitle={snap.targetCash > 0 ? `cíl: ${formatCZK(snap.targetCash)}` : undefined}
+              tooltip={`Zůstatek na běžném účtu ke konci měsíce. Cílová výše = bezpečnostní rezerva (${plan.baseline.safetyBufferMonths} měs.) × průměr měs. výdajů za posledních 12 měs. Kladný cashflow → přebytek nad cíl jde do investic. Záporný cashflow → hotovost absorbuje propad; pokud klesne pod 0, dorovná se výběrem z investic. Do průměru se nezahrnují jednorázové výdaje.`} />
             <KpiCard label="Investice" value={formatCZK(snap.investmentsBalance)} color="text-green-700" bg="bg-green-50"
-              tooltip="Zůstatek na investičním účtu (ETF, fondy apod.) k vybranému měsíci. Přebytek hotovosti nad bezpečnostní rezervou se automaticky přesouvá sem. Počáteční výši zadáš v Počátečním nastavení → Investice – zůstatek." />
+              tooltip="Hodnota portfolia ke konci měsíce. Výpočet: (zůstatek + příspěvek) × (1 + roční výnos)^(1/12). Příspěvek = přebytek hotovosti nad cílovou rezervu; záporný příspěvek = výběr při schodku. Počáteční výši nastavíš v Počátečním nastavení → Investice – zůstatek." />
             <KpiCard label="Majetek" value={formatCZK(snap.assetsValue)} color="text-indigo-700" bg="bg-indigo-50"
-              tooltip="Celková tržní hodnota nemovitostí a dalšího majetku ke konci vybraného měsíce. Hodnota každého aktiva roste ročním procentem zhodnocení nastaveným v panelu Majetek." />
-            <KpiCard label="Zůstatek hypotéky" value={formatCZK(snap.mortgageBalance)} color="text-orange-700" bg="bg-orange-50" />
+              tooltip="Tržní hodnota nemovitostí a dalšího majetku ke konci měsíce. Výpočet: pořizovací × (1 + roční zhodnocení)^(roky od pořízení). Pořizovací náklady se promítnou do hotovosti jen pokud sis přidala propojený jednorázový výdaj v panelu Příjmy a výdaje." />
+            <KpiCard label="Zůstatek hypotéky" value={formatCZK(snap.mortgageBalance)} color="text-orange-700" bg="bg-orange-50"
+              tooltip="Zbývající jistina ke konci měsíce. Klesá jen o jistinovou část anuity — úrok je náklad, ne splácení dluhu. Při změně sazby se jistina nemění, jen se přepočítá poměr úrok/jistina." />
             {/* Runway with info tooltip */}
             <div className="bg-gray-50 rounded-xl px-4 py-3 flex flex-col justify-between min-w-[110px]">
               <div className="flex items-center gap-1 mb-1">
@@ -215,10 +218,10 @@ export function ResultsSummary() {
                     <circle cx="12" cy="12" r="10" strokeWidth="2" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
                   </svg>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-gray-800 text-white text-xs p-3 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 rounded-lg bg-gray-800 text-white text-xs p-3 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 leading-relaxed">
                     <p className="font-semibold mb-1">Co je Runway?</p>
-                    <p>Počet měsíců, po které pokryješ výdaje z aktuální hotovosti a investic — i kdyby přestaly veškeré příjmy.</p>
-                    <p className="mt-1 text-gray-300">Výpočet: (hotovost + investice) ÷ průměrné měs. výdaje</p>
+                    <p>Počet měsíců, po které pokryješ výdaje z hotovosti a investic — i kdyby přestaly veškeré příjmy.</p>
+                    <p className="mt-1 text-gray-300">Výpočet: (hotovost + investice) ÷ průměr měs. výdajů za posledních 12 měs. (jen opakující se, bez jednorázových)</p>
                   </div>
                 </div>
               </div>
@@ -251,7 +254,7 @@ export function ResultsSummary() {
   );
 }
 
-function KpiCard({ label, value, color, bg, tooltip }: { label: string; value: string; color: string; bg: string; tooltip?: string }) {
+function KpiCard({ label, value, color, bg, tooltip, subtitle }: { label: string; value: string; color: string; bg: string; tooltip?: string; subtitle?: string }) {
   return (
     <div className={`${bg} rounded-xl px-4 py-3 flex flex-col justify-between min-w-[130px] flex-1`}>
       <div className="flex items-center gap-1 mb-1">
@@ -262,13 +265,14 @@ function KpiCard({ label, value, color, bg, tooltip }: { label: string; value: s
               <circle cx="12" cy="12" r="10" strokeWidth="2" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
             </svg>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg bg-gray-800 text-white text-xs p-3 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 rounded-lg bg-gray-800 text-white text-xs p-3 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 leading-relaxed">
               {tooltip}
             </div>
           </div>
         )}
       </div>
       <p className={`text-sm font-bold ${color}`}>{value}</p>
+      {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
     </div>
   );
 }
@@ -431,23 +435,25 @@ export function ResultsChart() {
               <tr>
                 <th className="px-3 py-2 text-left">{tableMode === "monthly" ? "Měsíc" : "Rok"}</th>
                 <Th tip={tableMode === "yearly"
-                  ? "Celkové příjmy za daný rok — součet všech měsíců (platy, pronájmy, dávky atd.)."
-                  : "Součet příjmů v daném měsíci (platy, pronájmy, dávky atd.)."}>Příjmy</Th>
+                  ? "Tok ∑ — součet všech příjmů za rok (platy, pronájmy, dávky, jednorázové). Položky s nastaveným růstem % se navyšují každý měsíc geometricky."
+                  : "Tok — součet všech aktivních příjmů v daném měsíci (platy, pronájmy, dávky, jednorázové). Položky s nastaveným růstem % se navyšují geometricky."}>Příjmy</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Celkové výdaje za daný rok — součet všech měsíců. Nezahrnuje splátku hypotéky."
-                  : "Součet výdajů v daném měsíci — bez splátky hypotéky."}>Výdaje</Th>
+                  ? "Tok ∑ — součet výdajů za rok, bez splátky hypotéky (ta je v samostatném sloupci). Nákup nemovitosti se promítne jen pokud sis přidala jednorázový výdaj v panelu Příjmy a výdaje."
+                  : "Tok — součet výdajů v daném měsíci, bez splátky hypotéky. Nákup nemovitosti se promítne jen pokud sis přidala jednorázový výdaj v panelu Příjmy a výdaje."}>Výdaje</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Celková splátka hypotéky za rok (jistina + úrok + pojistné). Nezahrnuje mimořádné splátky."
-                  : "Splátka hypotéky v daném měsíci (jistina + úrok + pojistné)."}>Splátka hypo</Th>
+                  ? "Tok ∑ — součet měsíčních anuit za rok. Anuita = jistina + úrok + pojistné. Pokud proběhla změna sazby, zahrnuje splátky za různé sazby."
+                  : "Tok — měsíční anuita hypotéky = jistina + úrok + případné pojistné. Při každé změně sazby se přepočítá ze zbývající jistiny a počtu zbývajících měsíců."}>Splátka hypo</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Zůstatek na běžném účtu ke konci roku. Přebytek nad bezpečnostní rezervu se průběžně přesouvá do investic — proto může být hotovost nižší, než čekáš."
-                  : "Zůstatek na běžném účtu na konci měsíce. Přebytek nad bezpečnostní rezervu se přesouvá do investic."}>Hotovost</Th>
+                  ? "Stav ke konci prosince. Cíl = bezpečnostní rezerva × průměr měs. výdajů za posledních 12 měs. (jen opakující se, bez jednorázových). Přebytek nad cíl jde do investic, schodek se krytí z investic."
+                  : "Stav ke konci měsíce. Cíl = bezpečnostní rezerva × průměr měs. výdajů za posledních 12 měs. (jen opakující se, bez jednorázových). Přebytek nad cíl jde do investic, schodek se krytí z investic."}>Hotovost</Th>
                 <Th tip={tableMode === "yearly"
-                  ? "Zůstatek investičního portfolia ke konci roku. Sem automaticky putuje přebytek hotovosti nad bezpečnostní rezervu. Roste i o výnos (nastavený v Počátečním nastavení)."
-                  : "Zůstatek investičního portfolia na konci měsíce. Přebytky nad bezpečnostní rezervu se automaticky přesouvají sem."}>Investice</Th>
-                <Th tip="Celková tržní hodnota nemovitostí a dalšího majetku ke konci měsíce.">Majetek</Th>
-                <Th tip="Čisté jmění = hotovost + investice + majetek − zbývající jistina hypotéky.">Čisté jmění</Th>
-                <Th tip="Zbývající jistina hypotéky ke konci období — klesá s každou splátkou.">Hypo zůstatek</Th>
+                  ? "Stav ke konci roku. Výpočet každý měsíc: (zůstatek + příspěvek) × (1 + roční výnos)^(1/12). Příspěvek = přebytek hotovosti nad cíl; záporný = výběr při schodku."
+                  : "Stav ke konci měsíce. Výpočet: (zůstatek + příspěvek) × (1 + roční výnos)^(1/12). Příspěvek = přebytek hotovosti nad cílovou rezervu; záporný příspěvek = výběr při schodku hotovosti."}>Investice</Th>
+                <Th tip={tableMode === "yearly"
+                  ? "Stav ke konci roku. Tržní hodnota nemovitostí a dalšího majetku. Výpočet: pořizovací × (1 + roční zhodnocení)^(roky od pořízení). Pořizovací náklady se promítnou do hotovosti jen pokud sis přidala propojený jednorázový výdaj."
+                  : "Stav ke konci měsíce. Tržní hodnota nemovitostí a dalšího majetku. Výpočet: pořizovací × (1 + roční zhodnocení)^(roky od pořízení). Pořizovací náklady se promítnou do hotovosti jen pokud sis přidala propojený jednorázový výdaj."}>Majetek</Th>
+                <Th tip="Stav = Hotovost + Investice + Majetek − Hypo zůstatek. Pokud eviduješ hypotéku, ale nemáš přidanou nemovitost v Majetku, bude záporné — normální stav, chybí protiváha.">Čisté jmění</Th>
+                <Th tip="Stav — zbývající jistina ke konci období. Klesá jen o jistinovou část anuity (úrok je náklad, ne splácení dluhu). Při změně sazby se jistina nemění, jen se přepočítá poměr úrok/jistina.">Hypo zůstatek</Th>
                 <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>

@@ -76,6 +76,7 @@ export interface MonthlySnapshot {
   mortgageBalance: number;             // remaining principal across all mortgages
   assetsValue: number;                 // sum of all asset values this month
   netWorth: number;                    // cash + investments + assetsValue - mortgageBalance
+  targetCash: number;                  // safetyBuffer × trailing-12m avg recurring expenses
   runwayMonths: number;
   flags: string[];
 }
