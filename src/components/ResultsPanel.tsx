@@ -296,7 +296,7 @@ function Th({ children, tip }: { children: React.ReactNode; tip: string }) {
 export function ResultsChart() {
   const { plan, snapshots } = usePlanStore();
   const [showTable, setShowTable] = useState<boolean>(() => loadShowTable());
-  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("yearly");
+  const [tableMode, setTableMode] = useState<"yearly" | "monthly">("monthly");
   const [visibleSeries, setVisibleSeries] = useState<Set<SeriesKey>>(() => loadVisibleSeries());
   const [detailMonth, setDetailMonth] = useState<number | null>(null);
 
