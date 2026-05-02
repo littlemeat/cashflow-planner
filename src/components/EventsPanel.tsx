@@ -225,7 +225,7 @@ function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventR
             <span className="relative group ml-1 flex-shrink-0">
               <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
                 <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
               </svg>
               <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal leading-relaxed">
                 {event.notes}

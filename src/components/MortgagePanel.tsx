@@ -60,9 +60,10 @@ export function MortgagePanel() {
         )}
       </div>
 
-      {!collapsed && plan.mortgages.length === 0 ? (
+      {!collapsed && (
+        plan.mortgages.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-6">Žádné hypotéky.</p>
-      ) : !collapsed ? (
+      ) : (
         <div className="space-y-4">
           {plan.mortgages.map((mortgage) => {
             const monthlyPayment = getInitialPayment(mortgage);
@@ -157,9 +158,8 @@ export function MortgagePanel() {
             );
           })}
         </div>
+      )
       )}
-
-      ) : null}
 
       {showForm && (
         <MortgageForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
