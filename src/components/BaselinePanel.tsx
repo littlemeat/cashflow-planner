@@ -44,92 +44,97 @@ export function BaselinePanel() {
         </button>
       </div>
       {!collapsed && <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Start date */}
-        <div>
-          <label htmlFor="baseline-startDate" className="block text-sm font-medium text-gray-700 mb-1">
-            Datum zahájení (rok-měsíc)
-          </label>
-          <input
-            id="baseline-startDate"
-            type="month"
-            name="startDate"
-            value={form.startDate}
-            onChange={handleChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
+        {/* Grid: 1 col mobile → 2 col sm → 3 col md */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+
+          {/* Start date */}
+          <div>
+            <label htmlFor="baseline-startDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Datum zahájení
+            </label>
+            <input
+              id="baseline-startDate"
+              type="month"
+              name="startDate"
+              value={form.startDate}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          {/* Cash account */}
+          <div>
+            <label htmlFor="baseline-cashAccount" className="block text-sm font-medium text-gray-700 mb-1">
+              Hotovost / běžný účet (Kč)
+            </label>
+            <AmountInput
+              id="baseline-cashAccount"
+              value={form.cashAccount}
+              onChange={(v) => setForm((prev) => ({ ...prev, cashAccount: v }))}
+              min={0}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Investments balance */}
+          <div>
+            <label htmlFor="baseline-investmentsBalance" className="block text-sm font-medium text-gray-700 mb-1">
+              Investice – zůstatek (Kč)
+            </label>
+            <AmountInput
+              id="baseline-investmentsBalance"
+              value={form.investmentsBalance}
+              onChange={(v) => setForm((prev) => ({ ...prev, investmentsBalance: v }))}
+              min={0}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Investments yield */}
+          <div>
+            <label htmlFor="baseline-investmentsYieldAnnual" className="block text-sm font-medium text-gray-700 mb-1">
+              Roční výnos investic (%)
+            </label>
+            <input
+              id="baseline-investmentsYieldAnnual"
+              type="number"
+              name="investmentsYieldAnnual"
+              value={(form.investmentsYieldAnnual * 100).toFixed(2)}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  investmentsYieldAnnual: parseFloat(e.target.value) / 100 || 0,
+                }))
+              }
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min={0}
+              max={100}
+              step={0.1}
+            />
+          </div>
+
+          {/* Safety buffer months */}
+          <div>
+            <label htmlFor="baseline-safetyBufferMonths" className="block text-sm font-medium text-gray-700 mb-1">
+              Bezpečnostní rezerva (měsíce)
+            </label>
+            <input
+              id="baseline-safetyBufferMonths"
+              type="number"
+              name="safetyBufferMonths"
+              value={form.safetyBufferMonths}
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min={0}
+              max={36}
+              step={1}
+            />
+          </div>
+
         </div>
 
-        {/* Cash account */}
-        <div>
-          <label htmlFor="baseline-cashAccount" className="block text-sm font-medium text-gray-700 mb-1">
-            Hotovost / běžný účet (Kč)
-          </label>
-          <AmountInput
-            id="baseline-cashAccount"
-            value={form.cashAccount}
-            onChange={(v) => setForm((prev) => ({ ...prev, cashAccount: v }))}
-            min={0}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Investments balance */}
-        <div>
-          <label htmlFor="baseline-investmentsBalance" className="block text-sm font-medium text-gray-700 mb-1">
-            Investice – zůstatek (Kč)
-          </label>
-          <AmountInput
-            id="baseline-investmentsBalance"
-            value={form.investmentsBalance}
-            onChange={(v) => setForm((prev) => ({ ...prev, investmentsBalance: v }))}
-            min={0}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Investments yield */}
-        <div>
-          <label htmlFor="baseline-investmentsYieldAnnual" className="block text-sm font-medium text-gray-700 mb-1">
-            Roční výnos investic (%)
-          </label>
-          <input
-            id="baseline-investmentsYieldAnnual"
-            type="number"
-            name="investmentsYieldAnnual"
-            value={(form.investmentsYieldAnnual * 100).toFixed(2)}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                investmentsYieldAnnual: parseFloat(e.target.value) / 100 || 0,
-              }))
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min={0}
-            max={100}
-            step={0.1}
-          />
-        </div>
-
-        {/* Safety buffer months */}
-        <div>
-          <label htmlFor="baseline-safetyBufferMonths" className="block text-sm font-medium text-gray-700 mb-1">
-            Bezpečnostní rezerva (měsíce)
-          </label>
-          <input
-            id="baseline-safetyBufferMonths"
-            type="number"
-            name="safetyBufferMonths"
-            value={form.safetyBufferMonths}
-            onChange={handleChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min={0}
-            max={36}
-            step={1}
-          />
-        </div>
-
-        {/* Horizon slider */}
+        {/* Horizon slider — full width */}
         <div>
           <label htmlFor="baseline-horizonYears" className="block text-sm font-medium text-gray-700 mb-1">
             Horizont: <span className="font-bold text-blue-600">{form.horizonYears} let</span>
