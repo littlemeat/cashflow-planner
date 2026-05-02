@@ -38,6 +38,7 @@ export function EventsPanel() {
   const [editingEvent, setEditingEvent] = useState<CashflowEvent | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null); // null = stored order
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [collapsed, setCollapsed] = useState(false);
 
   const startDate = plan.baseline.startDate;
 
@@ -118,58 +119,72 @@ export function EventsPanel() {
   return (
     <div className="bg-white rounded-xl shadow p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Příjmy a výdaje</h2>
-        <div className="flex items-center gap-2">
-          <PresetPicker />
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
-          >
-            + Přidat položku
-          </button>
-        </div>
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+        >
+          <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          Příjmy a výdaje
+        </button>
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <PresetPicker />
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+            >
+              + Přidat položku
+            </button>
+          </div>
+        )}
       </div>
 
-      {plan.events.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-6">Žádné položky. Přidejte první.</p>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="w-6 px-2 py-2" aria-label="Přetáhnout" />
-                  <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
-                  <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
-                  <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekv.</th>
-                  <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
-                  <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
-                  <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
-                </tr>
-              </thead>
-              <SortableContext items={displayedEvents.map((e) => e.id)} strategy={verticalListSortingStrategy}>
-                <tbody>
-                  {displayedEvents.map((event) => (
-                    <SortableEventRow
-                      key={event.id}
-                      event={event}
-                      startDate={startDate}
-                      onEdit={() => setEditingEvent(event)}
-                      onDelete={() => handleDelete(event.id)}
-                    />
-                  ))}
-                </tbody>
-              </SortableContext>
-            </table>
-          </div>
-        </DndContext>
-      )}
+      {!collapsed && (
+        <>
+          {plan.events.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Žádné položky. Přidejte první.</p>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="w-6 px-2 py-2" aria-label="Přetáhnout" />
+                      <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
+                      <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
+                      <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekv.</th>
+                      <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
+                      <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
+                      <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
+                    </tr>
+                  </thead>
+                  <SortableContext items={displayedEvents.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+                    <tbody>
+                      {displayedEvents.map((event) => (
+                        <SortableEventRow
+                          key={event.id}
+                          event={event}
+                          startDate={startDate}
+                          onEdit={() => setEditingEvent(event)}
+                          onDelete={() => handleDelete(event.id)}
+                        />
+                      ))}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </div>
+            </DndContext>
+          )}
 
-      {showForm && <EventForm onSave={handleAdd} onCancel={() => setShowForm(false)} />}
-      {editingEvent && (
-        <EventForm initial={editingEvent} onSave={handleUpdate} onCancel={() => setEditingEvent(null)} />
+          {showForm && <EventForm onSave={handleAdd} onCancel={() => setShowForm(false)} />}
+          {editingEvent && (
+            <EventForm initial={editingEvent} onSave={handleUpdate} onCancel={() => setEditingEvent(null)} />
+          )}
+        </>
       )}
     </div>
   );
