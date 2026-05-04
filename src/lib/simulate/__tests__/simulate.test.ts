@@ -52,7 +52,7 @@ describe("simulate — simple income/expense", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
         {
           id: "e2",
@@ -62,7 +62,7 @@ describe("simulate — simple income/expense", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
       ],
     });
@@ -102,7 +102,7 @@ describe("simulate — simple income/expense", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
         {
           id: "e2",
@@ -112,7 +112,7 @@ describe("simulate — simple income/expense", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
       ],
     });
@@ -292,7 +292,7 @@ describe("simulate — inflation compounding", () => {
     // So ≈ 13 493 CZK — the spec says 13 439 which uses (1 + 0.03)^10 / 12 conversion
     // Let's compute: (1 + 0.03/12)^120 ≈ 1.34935
     // The spec value 13 439 corresponds to (1.03/12 * 120) approximation
-    // Our formula: amount * (1 + growthPct/12)^monthsActive
+    // Our formula: amount * (1 + growthSchedule[0].rateAnnual/12)^monthsActive
     const plan = makePlan({
       baseline: {
         startDate: "2026-01",
@@ -311,7 +311,7 @@ describe("simulate — inflation compounding", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0.03,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0.03 }],
         },
       ],
     });
@@ -352,7 +352,7 @@ describe("simulate — runway", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
       ],
     });

@@ -52,7 +52,7 @@ export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
         amount: salaryAmount,
         startMonth: fromOffset,
         endMonth: null,
-        annualGrowthPct: growthPct / 100,
+        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: growthPct / 100 }],
         presetGroup: groupId,
       };
 

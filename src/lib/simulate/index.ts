@@ -82,7 +82,22 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
     if (!isActiveAt(period, m)) continue;
 
     const monthsActive = m - evt.startMonth;
-    const growthFactor = Math.pow(1 + evt.annualGrowthPct / 12, monthsActive);
+
+    // Compound growth across schedule periods.
+    // Uses monthsActive (= m - startMonth) as the total elapsed months, matching the
+    // original single-rate formula: amount * (1 + rate/12)^monthsActive.
+    const sortedSchedule = [...evt.growthSchedule].sort((a, b) => a.fromMonth - b.fromMonth);
+    let growthFactor = 1;
+    for (let i = 0; i < sortedSchedule.length; i++) {
+      const entry = sortedSchedule[i]!;
+      const nextEntry = sortedSchedule[i + 1];
+      const periodStart = entry.fromMonth;                        // relative to startMonth
+      const periodEnd = nextEntry ? nextEntry.fromMonth : monthsActive;
+      const monthsInPeriod = Math.max(0, Math.min(monthsActive, periodEnd) - periodStart);
+      if (monthsInPeriod <= 0) continue;
+      growthFactor *= Math.pow(1 + entry.rateAnnual / 12, monthsInPeriod);
+    }
+
     const amount = evt.amount * growthFactor;
 
     let applies = false;

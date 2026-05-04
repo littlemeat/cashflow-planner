@@ -267,7 +267,17 @@ function SortableEventRow({ event, startDate, onEdit, onDelete, onDeletePreset }
         {event.endMonth != null ? formatYearMonth(addMonths(startDate, event.endMonth)) : "—"}
       </td>
       <td className="hidden sm:table-cell px-3 py-2 text-gray-600">
-        {event.annualGrowthPct !== 0 ? `${(event.annualGrowthPct * 100).toFixed(1)} %` : "—"}
+        {(() => {
+          const schedule = event.growthSchedule;
+          if (!schedule || schedule.length === 0) return "—";
+          const firstRate = schedule[0]!.rateAnnual;
+          if (schedule.length === 1) {
+            return firstRate !== 0 ? `${(firstRate * 100).toFixed(1)} % p.a.` : "—";
+          }
+          return firstRate !== 0
+            ? `${(firstRate * 100).toFixed(1)} % → více sazeb`
+            : `0 % → více sazeb`;
+        })()}
       </td>
       <td className="px-3 py-2">
         <div className="flex gap-2 flex-wrap">

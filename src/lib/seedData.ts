@@ -24,7 +24,7 @@ export const SEED_PLAN: Plan = {
       frequency: "monthly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0,
+      growthSchedule: [{ id: "seed-gs-1", fromMonth: 0, rateAnnual: 0 }],
     },
     {
       id: "evt-002",
@@ -34,7 +34,7 @@ export const SEED_PLAN: Plan = {
       frequency: "monthly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0,
+      growthSchedule: [{ id: "seed-gs-2", fromMonth: 0, rateAnnual: 0 }],
     },
     {
       id: "evt-003",
@@ -44,7 +44,7 @@ export const SEED_PLAN: Plan = {
       frequency: "monthly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0.04,
+      growthSchedule: [{ id: "seed-gs-3", fromMonth: 0, rateAnnual: 0.04 }],
     },
     {
       id: "evt-004",
@@ -54,7 +54,7 @@ export const SEED_PLAN: Plan = {
       frequency: "monthly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0.03,
+      growthSchedule: [{ id: "seed-gs-4", fromMonth: 0, rateAnnual: 0.03 }],
     },
     {
       id: "evt-005",
@@ -64,7 +64,7 @@ export const SEED_PLAN: Plan = {
       frequency: "monthly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0.025,
+      growthSchedule: [{ id: "seed-gs-5", fromMonth: 0, rateAnnual: 0.025 }],
     },
     {
       id: "evt-006",
@@ -74,7 +74,7 @@ export const SEED_PLAN: Plan = {
       frequency: "yearly",
       startMonth: 0,
       endMonth: null,
-      annualGrowthPct: 0.04,
+      growthSchedule: [{ id: "seed-gs-6", fromMonth: 0, rateAnnual: 0.04 }],
     },
   ],
   mortgages: [

@@ -42,13 +42,25 @@ function rebaseOffsets(plan: Plan, oldStartDate: string, newStartDate: string): 
 }
 
 // Migrate old plan formats: add assets[] if missing, convert single extraPayment to array,
-// add schemaVersion (version 1 = original plan format from phases 1–4, no schemaVersion field)
+// add schemaVersion (version 1 = original plan format from phases 1–4, no schemaVersion field),
+// migrate annualGrowthPct to growthSchedule on events
 function migratePlan(raw: unknown): Plan {
   const plan = raw as Plan & { mortgages: Array<Record<string, unknown>> };
   return {
     ...plan,
     schemaVersion: plan.schemaVersion ?? 1,
     assets: plan.assets ?? [],
+    events: (plan.events ?? []).map((e) => {
+      const legacy = e as unknown as Record<string, unknown>;
+      if (!Array.isArray(legacy['growthSchedule'])) {
+        // Old format: had annualGrowthPct, no growthSchedule
+        return {
+          ...e,
+          growthSchedule: [{ id: uuidv4(), fromMonth: 0, rateAnnual: (legacy['annualGrowthPct'] as number) ?? 0 }],
+        };
+      }
+      return e;
+    }),
     mortgages: plan.mortgages.map((m) => {
       const legacy = m as unknown as Record<string, unknown>;
       if (legacy["extraPayment"] && !legacy["extraPayments"]) {

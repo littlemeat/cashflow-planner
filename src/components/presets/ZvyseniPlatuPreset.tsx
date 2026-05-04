@@ -62,7 +62,7 @@ export function ZvyseniPlatuPreset({ onClose }: ZvyseniPlatuPresetProps) {
         amount: newAmount,
         startMonth: wizardStartOffset,
         endMonth: null,
-        annualGrowthPct: targetEvent.annualGrowthPct,
+        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: targetEvent.growthSchedule[0]?.rateAnnual ?? 0 }],
         presetGroup: groupId,
       };
 

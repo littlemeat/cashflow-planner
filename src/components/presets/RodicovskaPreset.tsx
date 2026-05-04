@@ -39,7 +39,7 @@ export function RodicovskaPreset({ onClose }: RodicovskaPresetProps) {
         amount: monthlyAmount,
         startMonth: wizardStartOffset,
         endMonth: durationMonths > 0 ? endOffset : null,
-        annualGrowthPct: 0,
+        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
         presetGroup: groupId,
       };
       return { ...plan, events: [...plan.events, newEvent] };

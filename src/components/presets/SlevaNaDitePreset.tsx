@@ -88,7 +88,7 @@ export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
         amount: totalSleva,
         startMonth: wizardStartOffset,
         endMonth: baseEndOffset,
-        annualGrowthPct: 0,
+        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
         presetGroup: groupId,
       });
 
@@ -107,7 +107,7 @@ export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
           amount: inc.amount,
           startMonth: incStartOffset,
           endMonth: incEndOffset,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
           presetGroup: groupId,
         });
       }

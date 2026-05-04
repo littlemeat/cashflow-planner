@@ -56,7 +56,7 @@ export function PrevzetiHypoteky({ onClose }: Props) {
         amount: cashPayment,
         startMonth: takeoverOffset,
         endMonth: null,
-        annualGrowthPct: 0,
+        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
       });
     }
 

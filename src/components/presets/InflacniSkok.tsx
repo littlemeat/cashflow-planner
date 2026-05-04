@@ -1,7 +1,6 @@
-// Preset wizard: Inflační skok — splits expense events at a date with a new growth rate
+// Preset wizard: Inflační skok — adds a growth schedule entry to expense events at a date
 import { useState, useEffect } from "react";
 import { usePlanStore } from "../../store/usePlanStore";
-import { CashflowEvent } from "../../types";
 import { Modal } from "../Modal";
 import { dateToMonthOffset, monthOffsetToDate } from "../../lib/formatters";
 
@@ -61,46 +60,22 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
     }
     setNothingAffectedError(false);
 
-    const groupId = crypto.randomUUID();
     const newRate = newGrowthPct / 100;
 
-    batchUpdate((plan) => {
-      let events = plan.events;
-      const eventsToSplit = expenseEvents.filter(
-        (evt) => selectedIds.has(evt.id) && fromOffset > evt.startMonth
-      );
-
-      for (const evt of eventsToSplit) {
-        // Compute the grown amount at the split point
-        const monthsActive = fromOffset - evt.startMonth;
-        const grownAmount =
-          monthsActive > 0
-            ? evt.amount * Math.pow(1 + evt.annualGrowthPct / 12, monthsActive)
-            : evt.amount;
-
-        // End the original event at fromOffset - 1
-        events = events.map((e) =>
-          e.id === evt.id ? { ...e, endMonth: fromOffset - 1, presetGroup: groupId } : e
-        );
-
-        // Create a new event starting at fromOffset with the new growth rate
-        const newEvent: CashflowEvent = {
-          id: crypto.randomUUID(),
-          name: evt.name,
-          category: "expense",
-          frequency: evt.frequency,
-          amount: grownAmount,
-          startMonth: fromOffset,
-          endMonth: evt.endMonth,
-          annualGrowthPct: newRate,
-          notes: evt.notes,
-          presetGroup: groupId,
-        };
-        events = [...events, newEvent];
-      }
-
-      return { ...plan, events };
-    });
+    batchUpdate((plan) => ({
+      ...plan,
+      events: plan.events.map((evt) => {
+        if (!selectedIds.has(evt.id)) return evt;
+        if (fromOffset <= evt.startMonth) return evt; // skip if before event start
+        const relativeMonth = fromOffset - evt.startMonth;
+        // Remove any existing schedule entries at or after this point, then add new one
+        const newSchedule = [
+          ...evt.growthSchedule.filter((entry) => entry.fromMonth < relativeMonth),
+          { id: crypto.randomUUID(), fromMonth: relativeMonth, rateAnnual: newRate },
+        ];
+        return { ...evt, growthSchedule: newSchedule };
+      }),
+    }));
 
     setSuccess(true);
   }
@@ -150,9 +125,6 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
               <p className="text-xs text-gray-500 mt-1">
                 Nová míra růstu platí od:{" "}
                 <span className="font-medium">{fromMonth.replace("-", "/")}</span>
-                {fromOffset > 0 && (
-                  <> — původní část bude ukončena: {monthOffsetToDate(fromOffset - 1, startDate).replace("-", "/")}</>
-                )}
               </p>
             </div>
 
@@ -188,23 +160,26 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
                 </button>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                {expenseEvents.map((evt) => (
-                  <label
-                    key={evt.id}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(evt.id)}
-                      onChange={() => toggleEvent(evt.id)}
-                      className="accent-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">{evt.name}</span>
-                    <span className="text-xs text-gray-400 ml-auto">
-                      {(evt.annualGrowthPct * 100).toFixed(1)} % → {newGrowthPct.toFixed(1)} %
-                    </span>
-                  </label>
-                ))}
+                {expenseEvents.map((evt) => {
+                  const currentRate = evt.growthSchedule[0]?.rateAnnual ?? 0;
+                  return (
+                    <label
+                      key={evt.id}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(evt.id)}
+                        onChange={() => toggleEvent(evt.id)}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">{evt.name}</span>
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {(currentRate * 100).toFixed(1)} % → {newGrowthPct.toFixed(1)} %
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
 

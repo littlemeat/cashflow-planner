@@ -20,7 +20,7 @@ export interface CashflowEvent {
   frequency: FrequencyType;
   startMonth: number;
   endMonth: number | null;
-  annualGrowthPct: number;
+  growthSchedule: Array<{ id: string; fromMonth: number; rateAnnual: number }>;
   notes?: string;
   presetGroup?: string;
 }

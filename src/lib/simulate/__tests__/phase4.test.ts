@@ -1,7 +1,7 @@
 // Phase 4 unit tests
 // Covers: AC-MonthDetail-1, AC-MonthDetail-2, AC-InflacniSkok-1
 import { describe, it, expect } from "vitest";
-import { getMonthDetail } from "../index";
+import { simulate, getMonthDetail } from "../index";
 import { Plan, Baseline, CashflowEvent } from "../../../types";
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ describe("AC-MonthDetail-1 — getMonthDetail per-event breakdown at month 0", (
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
         {
           id: "e2",
@@ -53,7 +53,7 @@ describe("AC-MonthDetail-1 — getMonthDetail per-event breakdown at month 0", (
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0 }],
         },
       ],
     });
@@ -85,8 +85,11 @@ describe("AC-MonthDetail-1 — getMonthDetail per-event breakdown at month 0", (
 // ── AC-MonthDetail-2: growth at month 1 ──────────────────────────────────────
 
 describe("AC-MonthDetail-2 — getMonthDetail growth at month 1", () => {
-  it("10000 at annualGrowthPct=0.12 → amount at month 1 ≈ 10100", () => {
-    // 1% per month: 10000 * (1 + 0.12/12)^1 = 10000 * 1.01 = 10100
+  it("10000 at rateAnnual=0.12 → amount at month 1 ≈ 10100", () => {
+    // monthsActive = 1 - 0 = 1
+    // Single entry: monthsInPeriod = max(0, 1-0) = 1
+    // factor = (1 + 0.12/12)^1 = 1.01
+    // amount = 10000 * 1.01 = 10100
     const plan = makePlan({
       events: [
         {
@@ -97,7 +100,7 @@ describe("AC-MonthDetail-2 — getMonthDetail growth at month 1", () => {
           frequency: "monthly",
           startMonth: 0,
           endMonth: null,
-          annualGrowthPct: 0.12,
+          growthSchedule: [{ id: "test-gs", fromMonth: 0, rateAnnual: 0.12 }],
         },
       ],
     });
@@ -112,95 +115,133 @@ describe("AC-MonthDetail-2 — getMonthDetail growth at month 1", () => {
   });
 });
 
-// ── AC-InflacniSkok-1: pure math — split logic ────────────────────────────────
+// ── AC-InflacniSkok-1: growthSchedule piecewise compounding ──────────────────
 //
-// The InflacniSkok preset is a React component and cannot be unit-tested directly
-// without a DOM. Instead, we test the core math it applies:
-//   - grownAmount at the split point
-//   - new event's annualGrowthPct
-//   - original event endMonth = fromOffset - 1
+// The new InflacniSkok preset adds a growthSchedule entry to existing events instead
+// of splitting them. We test the simulation math directly with a 2-entry schedule.
 //
-// We replicate the exact computation from InflacniSkok.tsx handleSubmit.
+// Growth formula: monthsInPeriod uses max(0, monthsActive - periodStart) for the
+// last period and max(0, min(monthsActive, nextFromMonth) - periodStart) for others.
+// This preserves backward compatibility: single entry = old annualGrowthPct behavior.
 
-describe("AC-InflacniSkok-1 — split math for expense event", () => {
-  it("expense 10000, annualGrowthPct=0.03, split at month 6 → grownAmount ≈ 10151, newRate = 0.05", () => {
-    // Mirroring InflacniSkok.tsx handleSubmit logic:
-    const evt: CashflowEvent = {
-      id: "ev1",
-      name: "Groceries",
-      category: "expense",
-      amount: 10_000,
-      frequency: "monthly",
-      startMonth: 0,
-      endMonth: null,
-      annualGrowthPct: 0.03,
-    };
+describe("AC-InflacniSkok-1 — growthSchedule piecewise compounding", () => {
+  it("expense 10000, 3% for first 6 months, 5% from period [6,∞): new rate applies from month 7", () => {
+    // Two entries: {fromMonth:0, rate:0.03} and {fromMonth:6, rate:0.05}
+    // At month 6 (monthsActive=6):
+    //   Period 0 [0,6): min(6,6)-0=6 months at 3% → (1+0.03/12)^6
+    //   Period 1 [6,∞): max(0,6-6)=0 → skipped
+    // At month 7 (monthsActive=7):
+    //   Period 0 [0,6): min(7,6)-0=6 months at 3% → (1+0.03/12)^6
+    //   Period 1 [6,∞): max(0,7-6)=1 month at 5% → (1+0.05/12)^1
+    //   factor = (1+0.03/12)^6 * (1+0.05/12)^1
+    const plan = makePlan({
+      baseline: {
+        startDate: "2026-09",
+        cashAccount: 100_000_000,
+        investmentsBalance: 0,
+        investmentsYieldAnnual: 0,
+        safetyBufferMonths: 0,
+        horizonYears: 5,
+      },
+      events: [
+        {
+          id: "e1",
+          name: "Groceries",
+          category: "expense",
+          amount: 10_000,
+          frequency: "monthly",
+          startMonth: 0,
+          endMonth: null,
+          growthSchedule: [
+            { id: "gs-1", fromMonth: 0, rateAnnual: 0.03 },
+            { id: "gs-2", fromMonth: 6, rateAnnual: 0.05 },
+          ],
+        },
+      ],
+    });
 
-    const fromOffset = 6; // split at month 6
-    const newGrowthPct = 5; // 5% new rate entered by user
-    const newRate = newGrowthPct / 100; // 0.05
+    const snapshots = simulate(plan);
 
-    // Replicating the preset's grown-amount formula:
-    const monthsActive = fromOffset - evt.startMonth; // 6 - 0 = 6
-    const grownAmount =
-      monthsActive > 0
-        ? evt.amount * Math.pow(1 + evt.annualGrowthPct / 12, monthsActive)
-        : evt.amount;
+    // Month 6: only 3% applies (period 1 monthsInPeriod=0)
+    const factorAtMonth6 = Math.pow(1 + 0.03/12, 6);
+    expect(snapshots[6]?.expenses).toBeCloseTo(10_000 * factorAtMonth6, 0);
 
-    // Expected: 10000 * (1 + 0.03/12)^6 = 10000 * (1.0025)^6
-    // (1.0025)^6 ≈ 1.01506... → ~10150.94
-    const expected = 10_000 * Math.pow(1 + 0.03 / 12, 6);
+    // Month 7: 3% for 6 months + 5% for 1 month
+    const factorAtMonth7 = Math.pow(1 + 0.03/12, 6) * Math.pow(1 + 0.05/12, 1);
+    expect(snapshots[7]?.expenses).toBeCloseTo(10_000 * factorAtMonth7, 0);
 
-    expect(grownAmount).toBeCloseTo(expected, 4);
-    // The AC says ≈ 10151 — verify within 1 CZK
-    expect(Math.abs(grownAmount - 10_151)).toBeLessThan(1);
-
-    // New event properties
-    const newEventStartMonth = fromOffset; // 6
-    const originalEventEndMonth = fromOffset - 1; // 5
-
-    expect(newEventStartMonth).toBe(6);
-    expect(originalEventEndMonth).toBe(5);
-    expect(newRate).toBeCloseTo(0.05, 5);
-
-    // Verify the new event would carry the correct amount
-    const newEvent = {
-      name: evt.name,
-      category: "expense" as const,
-      frequency: evt.frequency,
-      amount: grownAmount,
-      startMonth: fromOffset,
-      endMonth: evt.endMonth,
-      annualGrowthPct: newRate,
-    };
-
-    expect(newEvent.amount).toBeCloseTo(10_151, 0);
-    expect(newEvent.annualGrowthPct).toBeCloseTo(0.05, 5);
-    expect(newEvent.startMonth).toBe(6);
+    // Month 7 expense must be greater than month 6 (5% rate adds more growth)
+    expect(snapshots[7]!.expenses).toBeGreaterThan(snapshots[6]!.expenses);
   });
 
-  it("monthsActive=0 (split at startMonth) → grownAmount equals original amount", () => {
-    const evt: CashflowEvent = {
-      id: "ev1",
-      name: "Rent",
-      category: "expense",
-      amount: 15_000,
-      frequency: "monthly",
-      startMonth: 3,
-      endMonth: null,
-      annualGrowthPct: 0.03,
-    };
+  it("single schedule entry produces same result as old annualGrowthPct formula", () => {
+    // Single entry {fromMonth:0, rateAnnual:0.03}:
+    // monthsInPeriod = max(0, monthsActive-0) = monthsActive
+    // factor = (1+0.03/12)^monthsActive — identical to old formula
+    const plan = makePlan({
+      baseline: {
+        startDate: "2026-09",
+        cashAccount: 100_000_000,
+        investmentsBalance: 0,
+        investmentsYieldAnnual: 0,
+        safetyBufferMonths: 0,
+        horizonYears: 2,
+      },
+      events: [
+        {
+          id: "e1",
+          name: "Expense",
+          category: "expense",
+          amount: 10_000,
+          frequency: "monthly",
+          startMonth: 0,
+          endMonth: null,
+          growthSchedule: [{ id: "gs-1", fromMonth: 0, rateAnnual: 0.03 }],
+        },
+      ],
+    });
 
-    const fromOffset = 3; // same as startMonth
-    const monthsActive = fromOffset - evt.startMonth; // 0
+    const snapshots = simulate(plan);
 
-    const grownAmount =
-      monthsActive > 0
-        ? evt.amount * Math.pow(1 + evt.annualGrowthPct / 12, monthsActive)
-        : evt.amount;
+    // At month 0 (monthsActive=0): factor=1, amount=10000
+    expect(snapshots[0]?.expenses).toBeCloseTo(10_000, 0);
 
-    // No growth when split at startMonth
-    expect(grownAmount).toBe(15_000);
+    // At month 1 (monthsActive=1): factor=(1+0.03/12)^1
+    const expected1 = 10_000 * Math.pow(1 + 0.03/12, 1);
+    expect(snapshots[1]?.expenses).toBeCloseTo(expected1, 0);
+
+    // At month 12 (monthsActive=12): factor=(1+0.03/12)^12
+    const expected12 = 10_000 * Math.pow(1 + 0.03/12, 12);
+    expect(snapshots[12]?.expenses).toBeCloseTo(expected12, 0);
+  });
+
+  it("at month 0 (first active month), base amount is returned unchanged (no growth yet)", () => {
+    // monthsActive=0, single entry → monthsInPeriod=0, factor=1
+    const plan = makePlan({
+      baseline: {
+        startDate: "2026-09",
+        cashAccount: 100_000_000,
+        investmentsBalance: 0,
+        investmentsYieldAnnual: 0,
+        safetyBufferMonths: 0,
+        horizonYears: 1,
+      },
+      events: [
+        {
+          id: "e1",
+          name: "Expense",
+          category: "expense",
+          amount: 15_000,
+          frequency: "monthly",
+          startMonth: 0,
+          endMonth: null,
+          growthSchedule: [{ id: "gs-1", fromMonth: 0, rateAnnual: 0.03 }],
+        },
+      ],
+    });
+
+    const snapshots = simulate(plan);
+    expect(snapshots[0]?.expenses).toBeCloseTo(15_000, 0);
   });
 });
 
@@ -211,27 +252,27 @@ describe("AC-InflacniSkok-1 — split math for expense event", () => {
 describe("AC-NavratDoPrice-1 — Návrat do práce logic", () => {
   it("creates income event at fromOffset with correct properties", () => {
     // Replicate handleSubmit logic from NavratDoPrice.tsx
-    const fromOffset = 4; // some month offset
+    const fromOffset = 4;
     const salaryAmount = 60_000;
     const growthPct = 3;
     const name = "Plat po návratu";
 
     const groupId = "fake-group-id";
 
-    const newEvent = {
+    const newEvent: Omit<CashflowEvent, "id"> = {
       name,
-      category: "income" as const,
-      frequency: "monthly" as const,
+      category: "income",
+      frequency: "monthly",
       amount: salaryAmount,
       startMonth: fromOffset,
-      endMonth: null as null,
-      annualGrowthPct: growthPct / 100,
+      endMonth: null,
+      growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: growthPct / 100 }],
       presetGroup: groupId,
     };
 
     expect(newEvent.category).toBe("income");
     expect(newEvent.startMonth).toBe(fromOffset);
-    expect(newEvent.annualGrowthPct).toBeCloseTo(0.03, 5);
+    expect(newEvent.growthSchedule[0]!.rateAnnual).toBeCloseTo(0.03, 5);
     expect(newEvent.presetGroup).toBe(groupId);
   });
 
@@ -241,13 +282,12 @@ describe("AC-NavratDoPrice-1 — Návrat do práce logic", () => {
     const fromOffset = 4;
     const groupId = "fake-group-id";
 
-    // Simulate what updateEvent receives:
     const updatePayload = {
       endMonth: fromOffset - 1,
       presetGroup: groupId,
     };
 
-    expect(updatePayload.endMonth).toBe(3); // fromOffset - 1 = 3
+    expect(updatePayload.endMonth).toBe(3);
     expect(updatePayload.presetGroup).toBe(groupId);
   });
 
@@ -266,7 +306,6 @@ describe("AC-NavratDoPrice-1 — Návrat do práce logic", () => {
       category: "income" as const,
     };
 
-    // Both must share the same presetGroup
     expect(existingEventUpdate.presetGroup).toBe(newEventProperties.presetGroup);
   });
 });
