@@ -78,6 +78,7 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
   const contributions: EventContribution[] = [];
 
   for (const evt of events) {
+    if (evt.hidden) continue;
     const period: Period = { from: evt.startMonth, to: evt.endMonth !== null ? evt.endMonth + 1 : null };
     if (!isActiveAt(period, m)) continue;
 
@@ -141,6 +142,7 @@ function applyEvents(plan: Plan, m: number): AppliedEvents {
 
 function computeAssetsValue(assets: Asset[], m: number): number {
   return assets.reduce((sum, asset) => {
+    if (asset.hidden) return sum;
     if (m < asset.acquisitionMonth) return sum;
     const monthsHeld = m - asset.acquisitionMonth;
     const value =
@@ -168,6 +170,7 @@ function stepMonth(plan: Plan, state: SimState, m: number): StepResult {
     (mortState, i) => {
       const mortgage = mortgages[i]!;
 
+      if (mortgage.hidden) return mortState;
       if (mortgage.startMonth > m) return mortState;
       if (mortState.remainingPrincipal <= 0 || mortState.remainingMonths <= 0) return mortState;
 
@@ -282,7 +285,11 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
     current = result.nextState;
 
     const mortgageBalance = current.mortgageStates.reduce(
-      (sum, s, i) => sum + (mortgages[i]!.startMonth <= m ? s.remainingPrincipal : 0),
+      (sum, s, i) => {
+        const mortgage = mortgages[i]!;
+        if (mortgage.hidden) return sum;
+        return sum + (mortgage.startMonth <= m ? s.remainingPrincipal : 0);
+      },
       0
     );
     const assetsValue = computeAssetsValue(plan.assets ?? [], m);

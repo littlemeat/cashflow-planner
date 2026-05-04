@@ -23,6 +23,7 @@ export interface CashflowEvent {
   growthSchedule: Array<{ id: string; fromMonth: number; rateAnnual: number }>;
   notes?: string;
   presetGroup?: string;
+  hidden?: boolean;
 }
 
 export interface Mortgage {
@@ -39,6 +40,7 @@ export interface Mortgage {
     amount: number;
     strategy: "shorten-term" | "lower-payment";
   }>;
+  hidden?: boolean;
 }
 
 export interface Asset {
@@ -49,6 +51,7 @@ export interface Asset {
   appreciationAnnual: number;     // e.g. 0.02 for 2 %/year
   linkedExpenseId?: string;       // optional: one-off expense that paid for this
   linkedMortgageId?: string;      // optional: mortgage tied to this property
+  hidden?: boolean;
 }
 
 /** A half-open month-offset interval: active from `from` (inclusive) to `to` (exclusive, null = forever) */

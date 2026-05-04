@@ -34,6 +34,20 @@ import {
 type SortField = "name" | "category" | "startMonth" | "amount";
 type SortDir = "asc" | "desc";
 
+function EyeIcon({ hidden }: { hidden?: boolean }) {
+  return hidden ? (
+    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden>
+      <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+      <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden>
+      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
 export function EventsPanel() {
   const { plan, addEvent, updateEvent, deleteEvent, reorderEvents, deletePresetGroup } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
@@ -174,6 +188,7 @@ export function EventsPanel() {
                         startDate={startDate}
                         onEdit={() => setEditingEvent(event)}
                         onDelete={() => handleDelete(event.id)}
+                        onToggleHidden={() => updateEvent(event.id, { hidden: !event.hidden })}
                         onDeletePreset={
                           event.presetGroup && (presetGroupCounts.get(event.presetGroup) ?? 0) >= 2
                             ? () => handleDeletePresetGroup(event.presetGroup!)
@@ -204,17 +219,18 @@ interface SortableEventRowProps {
   startDate: string;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleHidden: () => void;
   onDeletePreset?: () => void;
 }
 
-function SortableEventRow({ event, startDate, onEdit, onDelete, onDeletePreset }: SortableEventRowProps) {
+function SortableEventRow({ event, startDate, onEdit, onDelete, onToggleHidden, onDeletePreset }: SortableEventRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: event.id });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : event.hidden ? 0.4 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -280,7 +296,14 @@ function SortableEventRow({ event, startDate, onEdit, onDelete, onDeletePreset }
         })()}
       </td>
       <td className="px-3 py-2">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <button
+            onClick={onToggleHidden}
+            title={event.hidden ? "Zobrazit v simulaci" : "Skrýt ze simulace"}
+            className={`flex items-center ${event.hidden ? "text-gray-300 hover:text-gray-500" : "text-gray-400 hover:text-gray-600"}`}
+          >
+            <EyeIcon hidden={event.hidden} />
+          </button>
           <button onClick={onEdit} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Upravit</button>
           <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs font-medium">Smazat</button>
           {onDeletePreset && (
