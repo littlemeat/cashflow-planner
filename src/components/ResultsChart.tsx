@@ -245,6 +245,54 @@ export function ResultsChart() {
     }
   }
 
+  function exportCSV() {
+    const BOM = "﻿";
+    const sep = ";";
+
+    const headers =
+      tableMode === "monthly"
+        ? ["Měsíc", "Příjmy", "Výdaje", "Splátka hypo", "Hotovost", "Investice", "Majetek", "Čisté jmění", "Hypo zůstatek", "Runway (měs.)"]
+        : ["Rok", "Příjmy ∑", "Výdaje ∑", "Splátka hypo ∑", "Hotovost", "Investice", "Majetek", "Čisté jmění", "Hypo zůstatek"];
+
+    const dataRows: string[][];
+
+    if (tableMode === "monthly") {
+      dataRows = snapshots.map((s) => [
+        s.date,
+        String(Math.round(s.income)),
+        String(Math.round(s.expenses)),
+        String(Math.round(s.mortgagePayment)),
+        String(Math.round(s.cashAccount)),
+        String(Math.round(s.investmentsBalance)),
+        String(Math.round(s.assetsValue)),
+        String(Math.round(s.netWorth)),
+        String(Math.round(s.mortgageBalance)),
+        isFinite(s.runwayMonths) ? String(Math.round(s.runwayMonths)) : "",
+      ]);
+    } else {
+      dataRows = yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd }) => [
+        String(year),
+        String(Math.round(annualIncome)),
+        String(Math.round(annualExpenses)),
+        String(Math.round(annualMortgagePayment)),
+        String(Math.round(s.cashAccount)),
+        String(Math.round(s.investmentsBalance)),
+        String(Math.round(assetsValueEnd)),
+        String(Math.round(s.netWorth)),
+        String(Math.round(s.mortgageBalance)),
+      ]);
+    }
+
+    const csv = BOM + [headers, ...dataRows].map((row) => row.join(sep)).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cashflow-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="bg-white rounded-xl shadow p-5 space-y-4 min-w-0">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -281,6 +329,15 @@ export function ResultsChart() {
                 Měsíčně
               </button>
             </>
+          )}
+          {showTable && (
+            <button
+              onClick={exportCSV}
+              className="text-xs font-medium rounded-full px-3 py-1 border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              title="Stáhnout tabulku jako CSV (Excel)"
+            >
+              ↓ CSV
+            </button>
           )}
           <button
             onClick={() => setShowTable((t) => !t)}
