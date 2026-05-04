@@ -45,6 +45,7 @@ export function stepMortgage(
   payment: number;
   interestPortion: number;
   principalPortion: number;
+  extraPaid: number;
   newState: MortgageState;
 } {
   const monthsElapsed = simulationMonth - mortgage.startMonth;
@@ -52,6 +53,7 @@ export function stepMortgage(
   let remainingPrincipal = state.remainingPrincipal;
   let remainingMonths = state.remainingMonths;
   let currentPayment = state.currentPayment;
+  let extraPaid = 0;
 
   // Apply all extra payments due this month, in order
   const extrasDue = (mortgage.extraPayments ?? []).filter(
@@ -62,6 +64,7 @@ export function stepMortgage(
     if (remainingPrincipal <= 0) break;
     const extra = Math.min(ep.amount, remainingPrincipal);
     remainingPrincipal -= extra;
+    extraPaid += extra;
 
     const rateAnnual = findCurrentRate(mortgage, monthsElapsed);
     const r = rateAnnual / 12;
@@ -101,6 +104,7 @@ export function stepMortgage(
     payment: actualPayment,
     interestPortion,
     principalPortion,
+    extraPaid,
     newState: {
       remainingPrincipal: Math.max(0, remainingPrincipal - principalPortion),
       remainingMonths: Math.max(0, remainingMonths - 1),

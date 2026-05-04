@@ -47,6 +47,7 @@ export function AssetsPanel() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
           className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
         >
           <svg

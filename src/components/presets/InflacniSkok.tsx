@@ -22,8 +22,14 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
   const [fromMonth, setFromMonth] = useState(monthOffsetToDate(0, startDate));
   const [newGrowthPct, setNewGrowthPct] = useState(5);
   const [success, setSuccess] = useState(false);
+  const [nothingAffectedError, setNothingAffectedError] = useState(false);
 
   const fromOffset = dateToMonthOffset(fromMonth, startDate);
+
+  // Count events that will actually be affected (fromOffset must be > evt.startMonth)
+  const effectiveCount = expenseEvents.filter(
+    (evt) => selectedIds.has(evt.id) && fromOffset > evt.startMonth
+  ).length;
 
   function toggleEvent(id: string) {
     setSelectedIds((prev) => {
@@ -48,6 +54,12 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (selectedIds.size === 0) return;
+
+    if (effectiveCount === 0) {
+      setNothingAffectedError(true);
+      return;
+    }
+    setNothingAffectedError(false);
 
     const groupId = crypto.randomUUID();
     const newRate = newGrowthPct / 100;
@@ -209,16 +221,21 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
               </button>
               <button
                 type="submit"
-                disabled={selectedIds.size === 0 || fromOffset <= 0}
+                disabled={selectedIds.size === 0 || fromOffset <= 0 || effectiveCount === 0}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
               >
-                Aplikovat ({selectedIds.size} výdajů)
+                Aplikovat ({effectiveCount} výdajů)
               </button>
             </div>
 
             {fromOffset <= 0 && (
               <p className="text-xs text-red-500">
                 Datum musí být po začátku plánu ({startDate.replace("-", "/")}).
+              </p>
+            )}
+            {nothingAffectedError && (
+              <p className="text-xs text-red-500">
+                Žádný výdaj nebyl upraven — zvolené datum je dřívější nebo rovno datu zahájení všech vybraných výdajů.
               </p>
             )}
           </form>

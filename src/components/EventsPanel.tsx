@@ -121,6 +121,7 @@ export function EventsPanel() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
           className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
         >
           <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

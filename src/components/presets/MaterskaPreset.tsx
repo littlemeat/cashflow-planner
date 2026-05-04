@@ -46,7 +46,7 @@ export function MaterskaPreset({ onClose }: MaterskaPresetProps) {
 
     addEvent(newEvent);
 
-    if (endEventId !== "none") {
+    if (endEventId !== "none" && wizardStartOffset > 0) {
       updateEvent(endEventId, { endMonth: wizardStartOffset - 1 });
     }
 
@@ -99,9 +99,15 @@ export function MaterskaPreset({ onClose }: MaterskaPresetProps) {
                 type="month"
                 value={startMonth}
                 onChange={(e) => setStartMonth(e.target.value)}
+                min={addMonths(startDate, 1)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
+              {wizardStartOffset === 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  Datum zahájení mateřské musí být po startu plánu.
+                </p>
+              )}
             </div>
 
             {/* Mode toggle */}

@@ -459,18 +459,33 @@ export function ResultsChart() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {/* Initial state row — baseline values before simulation */}
-              <tr className="bg-gray-50 text-gray-500 italic">
-                <td className="px-3 py-2 font-medium not-italic text-gray-700">Počáteční stav</td>
-                <td className="px-3 py-2 text-right">—</td>
-                <td className="px-3 py-2 text-right">—</td>
-                <td className="px-3 py-2 text-right">—</td>
-                <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.cashAccount)}</td>
-                <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.investmentsBalance)}</td>
-                <td className="px-3 py-2 text-right text-indigo-700">—</td>
-                <td className="px-3 py-2 text-right text-purple-600 font-medium not-italic">{formatCZK(plan.baseline.cashAccount + plan.baseline.investmentsBalance)}</td>
-                <td className="px-3 py-2 text-right">—</td>
-                <td className="px-3 py-2"></td>
-              </tr>
+              {(() => {
+                const assetsAtMonth0 = (plan.assets ?? [])
+                  .filter((a) => a.acquisitionMonth === 0)
+                  .reduce((sum, a) => sum + a.purchaseValue, 0);
+                const mortgageAtMonth0 = plan.mortgages
+                  .filter((m) => m.startMonth === 0)
+                  .reduce((sum, m) => sum + m.principal, 0);
+                const initialNetWorth =
+                  plan.baseline.cashAccount +
+                  plan.baseline.investmentsBalance +
+                  assetsAtMonth0 -
+                  mortgageAtMonth0;
+                return (
+                  <tr className="bg-gray-50 text-gray-500 italic">
+                    <td className="px-3 py-2 font-medium not-italic text-gray-700">Počáteční stav</td>
+                    <td className="px-3 py-2 text-right">—</td>
+                    <td className="px-3 py-2 text-right">—</td>
+                    <td className="px-3 py-2 text-right">—</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.cashAccount)}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">{formatCZK(plan.baseline.investmentsBalance)}</td>
+                    <td className="px-3 py-2 text-right text-indigo-700">{assetsAtMonth0 > 0 ? formatCZK(assetsAtMonth0) : "—"}</td>
+                    <td className="px-3 py-2 text-right text-purple-600 font-medium not-italic">{formatCZK(initialNetWorth)}</td>
+                    <td className="px-3 py-2 text-right">{mortgageAtMonth0 > 0 ? formatCZK(mortgageAtMonth0) : "—"}</td>
+                    <td className="px-3 py-2"></td>
+                  </tr>
+                );
+              })()}
               {tableMode === "yearly"
                 ? yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd }) => (
                     <tr

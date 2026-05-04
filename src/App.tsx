@@ -153,7 +153,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 py-3 px-6 text-center text-xs text-gray-400">
-        Cashflow Planner · Phase 1 · Uloženo: {new Date(plan.updatedAt).toLocaleString("cs-CZ")}
+        Cashflow Planner · Phase 4 · Uloženo: {new Date(plan.updatedAt).toLocaleString("cs-CZ")}
       </footer>
     </div>
   );

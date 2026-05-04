@@ -23,11 +23,16 @@ export function BaselinePanel() {
     }));
   }
 
+  useEffect(() => {
+    if (!saved) return;
+    const tid = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(tid);
+  }, [saved]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBaseline(form);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -35,6 +40,7 @@ export function BaselinePanel() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
           className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
         >
           <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

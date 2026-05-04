@@ -20,6 +20,7 @@ function principalAtMonth(mortgage: Mortgage, months: number): number {
 
 // Compute per-period payments for each rate schedule entry
 interface RatePeriodPayment {
+  id: string;
   fromMonth: number;
   rateAnnual: number;
   monthlyPayment: number;
@@ -30,6 +31,7 @@ function getRatePeriodPayments(mortgage: Mortgage): RatePeriodPayment[] {
     if (idx === 0) {
       // First period: use original principal and full term
       return {
+        id: rate.id,
         fromMonth: rate.fromMonth,
         rateAnnual: rate.rateAnnual,
         monthlyPayment: computeMonthlyPayment(
@@ -45,6 +47,7 @@ function getRatePeriodPayments(mortgage: Mortgage): RatePeriodPayment[] {
     const remaining = principalAtMonth(mortgage, monthsElapsed);
     const remainingMonths = mortgage.termMonths - rate.fromMonth;
     return {
+      id: rate.id,
       fromMonth: rate.fromMonth,
       rateAnnual: rate.rateAnnual,
       monthlyPayment: computeMonthlyPayment(
@@ -87,6 +90,7 @@ export function MortgagePanel() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
           className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
         >
           <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -174,7 +178,7 @@ export function MortgagePanel() {
                   <div className="space-y-1">
                     {ratePeriodPayments.map((period) => (
                       <div
-                        key={period.fromMonth}
+                        key={period.id}
                         className="flex items-center gap-2 text-xs text-gray-700"
                       >
                         <span className="bg-gray-100 rounded-full px-3 py-1 whitespace-nowrap">

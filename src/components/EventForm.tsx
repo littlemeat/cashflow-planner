@@ -45,6 +45,7 @@ export function EventForm({ initial, onSave, onCancel }: EventFormProps) {
   const [hasEndMonth, setHasEndMonth] = useState(initial?.endMonth != null);
   // Track whether the user has manually edited the growth % field
   const [growthTouched, setGrowthTouched] = useState(false);
+  const [endBeforeStartError, setEndBeforeStartError] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -95,9 +96,15 @@ export function EventForm({ initial, onSave, onCancel }: EventFormProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const resolvedEndMonth = hasEndMonth ? form.endMonth : null;
+    if (resolvedEndMonth !== null && resolvedEndMonth < form.startMonth) {
+      setEndBeforeStartError(true);
+      return;
+    }
+    setEndBeforeStartError(false);
     onSave({
       ...form,
-      endMonth: hasEndMonth ? form.endMonth : null,
+      endMonth: resolvedEndMonth,
     });
   }
 
@@ -239,15 +246,21 @@ export function EventForm({ initial, onSave, onCancel }: EventFormProps) {
                   id="event-endDate"
                   type="month"
                   value={monthOffsetToDate(form.endMonth ?? (form.startMonth + 12), startDate)}
-                  min={startDate}
-                  onChange={(e) =>
+                  min={monthOffsetToDate(form.startMonth, startDate)}
+                  onChange={(e) => {
+                    setEndBeforeStartError(false);
                     setForm((prev) => ({
                       ...prev,
                       endMonth: dateToMonthOffset(e.target.value, startDate),
-                    }))
-                  }
+                    }));
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {endBeforeStartError && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Datum konce nesmí být před datem začátku.
+                  </p>
+                )}
               </>
             )}
           </div>

@@ -152,7 +152,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
       const result = stepMortgage(state, mortgage, m);
       mortgageStates[i] = result.newState;
 
-      totalMortgagePayment += result.payment;
+      totalMortgagePayment += result.payment + result.extraPaid;
       totalInterestPortion += result.interestPortion;
       totalPrincipalPortion += result.principalPortion;
       totalInsurance += mortgage.insuranceMonthly ?? 0;
@@ -284,7 +284,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
       const result = stepMortgage(state, mortgage, m);
       mortgageStates[i] = result.newState;
 
-      totalMortgagePayment += result.payment;
+      totalMortgagePayment += result.payment + result.extraPaid;
       totalInterestPortion += result.interestPortion;
       totalPrincipalPortion += result.principalPortion;
       totalInsurance += mortgage.insuranceMonthly ?? 0;

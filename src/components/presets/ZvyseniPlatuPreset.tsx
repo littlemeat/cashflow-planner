@@ -40,11 +40,13 @@ export function ZvyseniPlatuPreset({ onClose }: ZvyseniPlatuPresetProps) {
 
     const groupId = crypto.randomUUID();
 
-    // End the existing event at specifiedMonth - 1
-    updateEvent(selectedEvent.id, {
-      endMonth: wizardStartOffset - 1,
-      presetGroup: groupId,
-    });
+    // End the existing event at specifiedMonth - 1 (only if start is after plan start)
+    if (wizardStartOffset > 0) {
+      updateEvent(selectedEvent.id, {
+        endMonth: wizardStartOffset - 1,
+        presetGroup: groupId,
+      });
+    }
 
     // Create a new event with the new amount starting at specifiedMonth
     const newEvent: Omit<CashflowEvent, "id"> = {

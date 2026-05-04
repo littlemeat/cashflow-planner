@@ -31,8 +31,8 @@ export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
 
     const groupId = crypto.randomUUID();
 
-    // If an existing income is selected to end, terminate it
-    if (endEventId !== "none") {
+    // If an existing income is selected to end, terminate it (only if start is after plan start)
+    if (endEventId !== "none" && fromOffset > 0) {
       updateEvent(endEventId, {
         endMonth: fromOffset - 1,
         presetGroup: groupId,
