@@ -386,6 +386,81 @@ describe("simulate — horizon change", () => {
   });
 });
 
+// ── Test FIX 1: Extra mortgage payment deducts from cashAccount ───────────────
+
+describe("simulate — extra payment deducts from cashAccount (FIX 1)", () => {
+  it("500k extra payment at month 12 reduces available funds vs no-extra baseline", () => {
+    // To verify the extra payment is truly subtracted from cash/investments:
+    // Use NO income events (pure cash drain), start with enough cash to cover
+    // regular annuities for the full period plus the one-time extra payment.
+    // Safety buffer = 0 means any surplus goes to investments immediately;
+    // if there is no surplus (only expenses), cash just drains.
+    // With no income: netCashflow = -(mortgagePayment) each month.
+    // At month 12 with extra: netCashflow = -(regularPayment + 500k).
+    // We verify: (cash + investments) at month 12 is ~500k lower with extra payment.
+    const EXTRA_AMOUNT = 500_000;
+    const STARTING_CASH = 10_000_000;
+
+    const sharedBaseline = {
+      startDate: "2026-01",
+      cashAccount: STARTING_CASH,
+      investmentsBalance: 0,
+      investmentsYieldAnnual: 0,
+      safetyBufferMonths: 0, // no buffer: surplus→investments, deficit→cash drains
+      horizonYears: 2,
+    };
+
+    const sharedMortgageBase = {
+      id: "m1",
+      name: "Test Mortgage",
+      principal: 6_000_000,
+      startMonth: 0,
+      termMonths: 360,
+      rateSchedule: [{ id: "r1", fromMonth: 0, rateAnnual: 0.045 }],
+    };
+
+    const planNoExtra = makePlan({
+      baseline: sharedBaseline,
+      mortgages: [sharedMortgageBase],
+    });
+
+    const planWithExtra = makePlan({
+      baseline: sharedBaseline,
+      mortgages: [
+        {
+          ...sharedMortgageBase,
+          extraPayments: [{ id: "ep1", month: 12, amount: EXTRA_AMOUNT, strategy: "shorten-term" }],
+        },
+      ],
+    });
+
+    const snapsNoExtra = simulate(planNoExtra);
+    const snapsWithExtra = simulate(planWithExtra);
+
+    // Total net worth (cash + investments) should be ~500k lower at month 12 with extra payment.
+    // We sum cash + investments because with safetyBuffer=0, the extra payment
+    // reduces the surplus that would otherwise flow into investments.
+    const totalNoExtra12 = snapsNoExtra[12]!.cashAccount + snapsNoExtra[12]!.investmentsBalance;
+    const totalWithExtra12 = snapsWithExtra[12]!.cashAccount + snapsWithExtra[12]!.investmentsBalance;
+    const totalFundsDiff = totalNoExtra12 - totalWithExtra12;
+
+    // Funds available should be ~500k lower with the extra payment (within 5k tolerance)
+    expect(totalFundsDiff).toBeGreaterThan(EXTRA_AMOUNT - 5_000);
+    expect(totalFundsDiff).toBeLessThan(EXTRA_AMOUNT + 5_000);
+
+    // Assertion 2: mortgageBalance at month 12 dropped far more than in prior months.
+    // The drop between months 11→12 includes the extra 500k + regular principal.
+    // Prior month drops (10→11) are regular amortization only (~8k).
+    const balanceDrop11to12 = snapsWithExtra[11]!.mortgageBalance - snapsWithExtra[12]!.mortgageBalance;
+    const balanceDrop10to11 = snapsWithExtra[10]!.mortgageBalance - snapsWithExtra[11]!.mortgageBalance;
+
+    // Drop at month 12 (which includes extra 500k) must vastly exceed the prior month drop
+    expect(balanceDrop11to12).toBeGreaterThan(EXTRA_AMOUNT);
+    // Prior month drop (regular amortization only) should be much smaller (< 20k)
+    expect(balanceDrop10to11).toBeLessThan(20_000);
+  });
+});
+
 // ── Edge cases ────────────────────────────────────────────────────────────────
 
 describe("simulate — edge cases", () => {
