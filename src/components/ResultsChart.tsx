@@ -254,34 +254,30 @@ export function ResultsChart() {
         ? ["Měsíc", "Příjmy", "Výdaje", "Splátka hypo", "Hotovost", "Investice", "Majetek", "Čisté jmění", "Hypo zůstatek", "Runway (měs.)"]
         : ["Rok", "Příjmy ∑", "Výdaje ∑", "Splátka hypo ∑", "Hotovost", "Investice", "Majetek", "Čisté jmění", "Hypo zůstatek"];
 
-    const dataRows: string[][];
-
-    if (tableMode === "monthly") {
-      dataRows = snapshots.map((s) => [
-        s.date,
-        String(Math.round(s.income)),
-        String(Math.round(s.expenses)),
-        String(Math.round(s.mortgagePayment)),
-        String(Math.round(s.cashAccount)),
-        String(Math.round(s.investmentsBalance)),
-        String(Math.round(s.assetsValue)),
-        String(Math.round(s.netWorth)),
-        String(Math.round(s.mortgageBalance)),
-        isFinite(s.runwayMonths) ? String(Math.round(s.runwayMonths)) : "",
-      ]);
-    } else {
-      dataRows = yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd }) => [
-        String(year),
-        String(Math.round(annualIncome)),
-        String(Math.round(annualExpenses)),
-        String(Math.round(annualMortgagePayment)),
-        String(Math.round(s.cashAccount)),
-        String(Math.round(s.investmentsBalance)),
-        String(Math.round(assetsValueEnd)),
-        String(Math.round(s.netWorth)),
-        String(Math.round(s.mortgageBalance)),
-      ]);
-    }
+    const dataRows: string[][] = tableMode === "monthly"
+      ? snapshots.map((s) => [
+          s.date,
+          String(Math.round(s.income)),
+          String(Math.round(s.expenses)),
+          String(Math.round(s.mortgagePayment)),
+          String(Math.round(s.cashAccount)),
+          String(Math.round(s.investmentsBalance)),
+          String(Math.round(s.assetsValue)),
+          String(Math.round(s.netWorth)),
+          String(Math.round(s.mortgageBalance)),
+          isFinite(s.runwayMonths) ? String(Math.round(s.runwayMonths)) : "",
+        ])
+      : yearlyRows.map(({ year, snapshot: s, annualIncome, annualExpenses, annualMortgagePayment, assetsValueEnd }) => [
+          String(year),
+          String(Math.round(annualIncome)),
+          String(Math.round(annualExpenses)),
+          String(Math.round(annualMortgagePayment)),
+          String(Math.round(s.cashAccount)),
+          String(Math.round(s.investmentsBalance)),
+          String(Math.round(assetsValueEnd)),
+          String(Math.round(s.netWorth)),
+          String(Math.round(s.mortgageBalance)),
+        ]);
 
     const csv = BOM + [headers, ...dataRows].map((row) => row.join(sep)).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
