@@ -1,8 +1,9 @@
 // Preset wizard: Převzetí hypotéky
 // Creates a one-time cash payment (purchase price − assumed principal) + a mortgage entry
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePlanStore } from "../../store/usePlanStore";
 import { AmountInput } from "../AmountInput";
+import { Modal } from "../Modal";
 import { formatCZK, computeMonthlyPayment, dateToMonthOffset, monthOffsetToDate } from "../../lib/formatters";
 
 interface Props {
@@ -10,9 +11,8 @@ interface Props {
 }
 
 export function PrevzetiHypoteky({ onClose }: Props) {
-  const { plan, addEvent, addMortgage } = usePlanStore();
+  const { plan, batchUpdate } = usePlanStore();
   const startDate = plan.baseline.startDate;
-  const mouseDownTarget = useRef<EventTarget | null>(null);
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [propertyPrice, setPropertyPrice] = useState(0);
@@ -47,20 +47,6 @@ export function PrevzetiHypoteky({ onClose }: Props) {
     e.preventDefault();
     if (remainingPrincipal <= 0 || termYears <= 0) return;
 
-    // 1. One-time cash payment (vlastní prostředky / doplatek)
-    if (cashPayment > 0) {
-      addEvent({
-        name: `Vlastní prostředky – ${mortgageName}`,
-        category: "expense",
-        frequency: "one-off",
-        amount: cashPayment,
-        startMonth: takeoverOffset,
-        endMonth: null,
-        growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
-      });
-    }
-
-    // 2. Build rate schedule
     const rateSchedule = [
       { id: crypto.randomUUID(), fromMonth: 0, rateAnnual: currentRate / 100 },
     ];
@@ -72,14 +58,32 @@ export function PrevzetiHypoteky({ onClose }: Props) {
       });
     }
 
-    // 3. Mortgage entry
-    addMortgage({
-      name: mortgageName,
-      principal: remainingPrincipal,
-      startMonth: takeoverOffset,
-      termMonths,
-      rateSchedule,
-      insuranceMonthly: insuranceMonthly > 0 ? insuranceMonthly : undefined,
+    // Atomic: one-time cash payment + mortgage in a single batchUpdate → single undo entry
+    batchUpdate((plan) => {
+      const events = cashPayment > 0
+        ? [...plan.events, {
+            id: crypto.randomUUID(),
+            name: `Vlastní prostředky – ${mortgageName}`,
+            category: "expense" as const,
+            frequency: "one-off" as const,
+            amount: cashPayment,
+            startMonth: takeoverOffset,
+            endMonth: null,
+            growthSchedule: [{ id: crypto.randomUUID(), fromMonth: 0, rateAnnual: 0 }],
+          }]
+        : plan.events;
+
+      const mortgage = {
+        id: crypto.randomUUID(),
+        name: mortgageName,
+        principal: remainingPrincipal,
+        startMonth: takeoverOffset,
+        termMonths,
+        rateSchedule,
+        insuranceMonthly: insuranceMonthly > 0 ? insuranceMonthly : undefined,
+      };
+
+      return { ...plan, events, mortgages: [...plan.mortgages, mortgage] };
     });
 
     setSuccess(true);
@@ -92,14 +96,8 @@ export function PrevzetiHypoteky({ onClose }: Props) {
   }, [success, onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      <div>
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Převzetí hypotéky</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Zavřít">×</button>
@@ -266,6 +264,6 @@ export function PrevzetiHypoteky({ onClose }: Props) {
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

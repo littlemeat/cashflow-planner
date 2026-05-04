@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { usePlanStore } from "../store/usePlanStore";
-import { formatCZK } from "../lib/formatters";
+import { formatCZK, formatRunway } from "../lib/formatters";
 import { MonthlySnapshot } from "../types";
 import { MonthDetailModal } from "./MonthDetailModal";
 import { InfoTooltip } from "./InfoTooltip";
@@ -60,10 +60,7 @@ export function loadVisibleSeries(): Set<SeriesKey> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-export function formatRunway(months: number): string {
-  if (!isFinite(months) || months > 9999) return "∞";
-  return `${Math.round(months)} měs.`;
-}
+export { formatRunway };
 
 export function formatYAxisCZK(value: number): string {
   const abs = Math.abs(value);
@@ -285,8 +282,11 @@ export function ResultsChart() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `cashflow-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    // Revoke after a short delay so the browser has time to start the download
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
   return (
@@ -377,10 +377,10 @@ export function ResultsChart() {
               {/* Initial state row — baseline values before simulation */}
               {(() => {
                 const assetsAtMonth0 = (plan.assets ?? [])
-                  .filter((a) => a.acquisitionMonth === 0)
+                  .filter((a) => a.acquisitionMonth === 0 && !a.hidden)
                   .reduce((sum, a) => sum + a.purchaseValue, 0);
                 const mortgageAtMonth0 = plan.mortgages
-                  .filter((m) => m.startMonth === 0)
+                  .filter((m) => m.startMonth === 0 && !m.hidden)
                   .reduce((sum, m) => sum + m.principal, 0);
                 const initialNetWorth =
                   plan.baseline.cashAccount +

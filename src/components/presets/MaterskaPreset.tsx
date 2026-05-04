@@ -206,7 +206,8 @@ export function MaterskaPreset({ onClose }: MaterskaPresetProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
+              disabled={wizardStartOffset === 0}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
             >
               Přidat do plánu
             </button>

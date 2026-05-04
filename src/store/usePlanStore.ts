@@ -125,6 +125,10 @@ interface PlanStore {
   addAsset: (asset: Omit<Asset, "id">) => void;
   updateAsset: (id: string, asset: Partial<Asset>) => void;
   deleteAsset: (id: string) => void;
+  /** Toggle hidden flag — does NOT push to undo history (visibility is not undoable) */
+  toggleEventHidden: (id: string) => void;
+  toggleMortgageHidden: (id: string) => void;
+  toggleAssetHidden: (id: string) => void;
   importPlan: (plan: Plan) => void;
   resetToSeed: () => void;
   reorderEvents: (orderedIds: string[]) => void;
@@ -294,7 +298,7 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       return {
         plan: updated,
         snapshots: simulate(updated),
-        history: [...state.history, state.plan].slice(-50),
+        history: pushHistory(state),
       };
     }),
 
@@ -309,7 +313,38 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       return {
         plan: updated,
         snapshots: simulate(updated),
-        history: [...state.history, state.plan].slice(-50),
+        history: pushHistory(state),
       };
+    }),
+
+  toggleEventHidden: (id) =>
+    set((state) => {
+      const updated = touchPlan({
+        ...state.plan,
+        events: state.plan.events.map((e) => e.id === id ? { ...e, hidden: !e.hidden } : e),
+      });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated) };
+      // No pushHistory — visibility toggles are not undoable
+    }),
+
+  toggleMortgageHidden: (id) =>
+    set((state) => {
+      const updated = touchPlan({
+        ...state.plan,
+        mortgages: state.plan.mortgages.map((m) => m.id === id ? { ...m, hidden: !m.hidden } : m),
+      });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated) };
+    }),
+
+  toggleAssetHidden: (id) =>
+    set((state) => {
+      const updated = touchPlan({
+        ...state.plan,
+        assets: (state.plan.assets ?? []).map((a) => a.id === id ? { ...a, hidden: !a.hidden } : a),
+      });
+      saveToStorage(updated);
+      return { plan: updated, snapshots: simulate(updated) };
     }),
 }));

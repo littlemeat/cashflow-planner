@@ -47,6 +47,7 @@ src/
       ZvyseniPlatuPreset.tsx  — salary raise (% change on existing income event)
       InflacniSkok.tsx        — adds a new growthSchedule entry on selected expense events from a chosen date
       NavratDoPrice.tsx       — return-to-work income event
+      PrevzetiHypoteky.tsx   — mortgage takeover wizard (one-time cash payment + mortgage, atomic batchUpdate)
   App.tsx — 3-row layout: KPI bar → (baseline | events+mortgages+assets) → chart
 ```
 
@@ -144,7 +145,8 @@ npx tsc --noEmit  # type check
 - **Phase 4**: InflacniSkok preset, NavratDoPrice preset, MonthDetailModal (click any chart month or table row), accessibility improvements.
 - **Architectural refactor**: CollapsiblePanel, Modal, InfoTooltip shared components (removed ~10× duplicated patterns); ResultsPanel split into ResultsSummary + ResultsChart + KpiCard; `stepMonth()` extracted as shared simulation core; `growthSchedule` replaces `annualGrowthPct`; `batchUpdate` + `deletePresetGroup` in store; `targetCash` in MonthlySnapshot; `schemaVersion` + `migratePlan()` for backward compat; AssetsPanel + AssetForm added.
 - **CSV export**: Monthly/yearly table export from ResultsChart, Czech Excel format.
-- **Hidden items**: `hidden?: boolean` on CashflowEvent, Mortgage, Asset — eye toggle in all three panels, items skipped entirely in simulation.
+- **Hidden items**: `hidden?: boolean` on CashflowEvent, Mortgage, Asset — eye toggle in all three panels, items skipped entirely in simulation. Toggle calls `toggleEventHidden` / `toggleMortgageHidden` / `toggleAssetHidden` (no undo history entry). `EyeIcon` shared component in `EyeIcon.tsx`.
+- **Audit fixes**: atomic `PrevzetiHypoteky` (batchUpdate), MortgagePanel multi-rate display fix, `formatRunway` in `formatters.ts`, growthSchedule pre-sorted once in `simulate()` + `getMonthDetail()`, `"﻿"` BOM escape in CSV, `revokeObjectURL` deferred via setTimeout, MaterskaPreset submit disabled at offset 0, all eye buttons have `aria-label`.
 
 ## Known decisions / non-obvious choices
 - `growthSchedule[].id: string` / `rateSchedule[].id: string` — stable UUID keys for React list rendering, not array index.

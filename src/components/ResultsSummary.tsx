@@ -1,14 +1,9 @@
 // KPI summary bar — shows key financial metrics at a selected month
 import { useState } from "react";
 import { usePlanStore } from "../store/usePlanStore";
-import { formatCZK } from "../lib/formatters";
+import { formatCZK, formatRunway } from "../lib/formatters";
 import { KpiCard } from "./KpiCard";
 import { InfoTooltip } from "./InfoTooltip";
-
-function formatRunway(months: number): string {
-  if (!isFinite(months) || months > 9999) return "∞";
-  return `${Math.round(months)} měs.`;
-}
 
 export function ResultsSummary() {
   const { snapshots, plan } = usePlanStore();

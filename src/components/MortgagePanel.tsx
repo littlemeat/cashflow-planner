@@ -4,22 +4,12 @@ import { usePlanStore } from "../store/usePlanStore";
 import { Mortgage } from "../types";
 import { MortgageForm } from "./MortgageForm";
 import { CollapsiblePanel } from "./CollapsiblePanel";
+import { EyeIcon } from "./EyeIcon";
 import { formatCZK, formatYearMonth, addMonths, computeMonthlyPayment } from "../lib/formatters";
 
-// Compute the remaining principal at a given number of months into the mortgage,
-// assuming constant payment from the first rate period.
-function principalAtMonth(mortgage: Mortgage, months: number): number {
-  const rate = mortgage.rateSchedule[0]?.rateAnnual ?? 0;
-  const r = rate / 12;
-  const payment = computeMonthlyPayment(mortgage.principal, rate, mortgage.termMonths);
-  if (r === 0) return Math.max(0, mortgage.principal - payment * months);
-  return (
-    mortgage.principal * Math.pow(1 + r, months) -
-    payment * ((Math.pow(1 + r, months) - 1) / r)
-  );
-}
-
-// Compute per-period payments for each rate schedule entry
+// Compute per-period payments for each rate schedule entry.
+// Iteratively tracks remaining principal through each period so multi-rate
+// mortgages (3+ periods) display the correct payment — not just the first rate.
 interface RatePeriodPayment {
   id: string;
   fromMonth: number;
@@ -28,54 +18,38 @@ interface RatePeriodPayment {
 }
 
 function getRatePeriodPayments(mortgage: Mortgage): RatePeriodPayment[] {
-  return mortgage.rateSchedule.map((rate, idx) => {
-    if (idx === 0) {
-      // First period: use original principal and full term
-      return {
-        id: rate.id,
-        fromMonth: rate.fromMonth,
-        rateAnnual: rate.rateAnnual,
-        monthlyPayment: computeMonthlyPayment(
-          mortgage.principal,
-          rate.rateAnnual,
-          mortgage.termMonths
-        ),
-      };
-    }
-    // Subsequent periods: compute remaining principal at rate boundary
-    const prevRate = mortgage.rateSchedule[idx - 1]!;
-    const monthsElapsed = rate.fromMonth - prevRate.fromMonth;
-    const remaining = principalAtMonth(mortgage, monthsElapsed);
-    const remainingMonths = mortgage.termMonths - rate.fromMonth;
-    return {
-      id: rate.id,
-      fromMonth: rate.fromMonth,
-      rateAnnual: rate.rateAnnual,
-      monthlyPayment: computeMonthlyPayment(
-        Math.max(0, remaining),
-        rate.rateAnnual,
-        Math.max(1, remainingMonths)
-      ),
-    };
-  });
-}
+  let principal = mortgage.principal;
+  let monthsRemaining = mortgage.termMonths;
+  const results: RatePeriodPayment[] = [];
 
-function EyeIcon({ hidden }: { hidden?: boolean }) {
-  return hidden ? (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden>
-      <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
-      <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.064 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden>
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-    </svg>
-  );
+  for (let idx = 0; idx < mortgage.rateSchedule.length; idx++) {
+    const rate = mortgage.rateSchedule[idx]!;
+    const payment = computeMonthlyPayment(principal, rate.rateAnnual, Math.max(1, monthsRemaining));
+    results.push({ id: rate.id, fromMonth: rate.fromMonth, rateAnnual: rate.rateAnnual, monthlyPayment: payment });
+
+    // Advance principal through this period for the next rate entry
+    const nextRate = mortgage.rateSchedule[idx + 1];
+    if (nextRate) {
+      const periodMonths = nextRate.fromMonth - rate.fromMonth;
+      const r = rate.rateAnnual / 12;
+      if (r === 0) {
+        principal = Math.max(0, principal - payment * periodMonths);
+      } else {
+        principal = Math.max(
+          0,
+          principal * Math.pow(1 + r, periodMonths) -
+            payment * ((Math.pow(1 + r, periodMonths) - 1) / r)
+        );
+      }
+      monthsRemaining -= periodMonths;
+    }
+  }
+
+  return results;
 }
 
 export function MortgagePanel() {
-  const { plan, addMortgage, updateMortgage, deleteMortgage } = usePlanStore();
+  const { plan, addMortgage, updateMortgage, deleteMortgage, toggleMortgageHidden } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
   const [editingMortgage, setEditingMortgage] = useState<Mortgage | null>(null);
 
@@ -131,7 +105,8 @@ export function MortgagePanel() {
                     <h3 className="font-semibold text-gray-800">{mortgage.name}</h3>
                     <div className="flex gap-2 items-center">
                       <button
-                        onClick={() => updateMortgage(mortgage.id, { hidden: !mortgage.hidden })}
+                        onClick={() => toggleMortgageHidden(mortgage.id)}
+                        aria-label={mortgage.hidden ? "Zobrazit v simulaci" : "Skrýt ze simulace"}
                         title={mortgage.hidden ? "Zobrazit v simulaci" : "Skrýt ze simulace"}
                         className={`flex items-center ${mortgage.hidden ? "text-gray-300 hover:text-gray-500" : "text-gray-400 hover:text-gray-600"}`}
                       >

@@ -170,6 +170,9 @@ function stepMonth(plan: Plan, state: SimState, m: number): StepResult {
     (mortState, i) => {
       const mortgage = mortgages[i]!;
 
+      // Hidden mortgage: return state unchanged (principal frozen, months don't tick).
+      // simulate() is always called fresh from initMortgageState, so there is no stale
+      // carry-over between user interactions. Toggling hidden back on resumes correctly.
       if (mortgage.hidden) return mortState;
       if (mortgage.startMonth > m) return mortState;
       if (mortState.remainingPrincipal <= 0 || mortState.remainingMonths <= 0) return mortState;
@@ -271,6 +274,15 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
   const { baseline, mortgages } = plan;
   const horizonMonths = baseline.horizonYears * 12;
 
+  // Pre-sort growthSchedules once here so applyEvents() doesn't sort on every month × event call.
+  // Only spreads events that actually have multiple schedule entries.
+  const events = plan.events.map((evt) =>
+    evt.growthSchedule.length > 1
+      ? { ...evt, growthSchedule: [...evt.growthSchedule].sort((a, b) => a.fromMonth - b.fromMonth) }
+      : evt
+  );
+  const preparedPlan: Plan = { ...plan, events };
+
   let current: SimState = {
     cashAccount: baseline.cashAccount,
     investmentsBalance: baseline.investmentsBalance,
@@ -281,7 +293,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
   const snapshots: MonthlySnapshot[] = [];
 
   for (let m = 0; m <= horizonMonths; m++) {
-    const result = stepMonth(plan, current, m);
+    const result = stepMonth(preparedPlan, current, m);
     current = result.nextState;
 
     const mortgageBalance = current.mortgageStates.reduce(
@@ -292,7 +304,7 @@ export function simulate(plan: Plan): MonthlySnapshot[] {
       },
       0
     );
-    const assetsValue = computeAssetsValue(plan.assets ?? [], m);
+    const assetsValue = computeAssetsValue(preparedPlan.assets ?? [], m);
     const netWorth = current.cashAccount + current.investmentsBalance + assetsValue - mortgageBalance;
 
     snapshots.push({
@@ -325,6 +337,14 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
   const horizonMonths = baseline.horizonYears * 12;
   const clampedTarget = Math.min(targetMonth, horizonMonths);
 
+  // Pre-sort growthSchedules once (same optimisation as simulate())
+  const events = plan.events.map((evt) =>
+    evt.growthSchedule.length > 1
+      ? { ...evt, growthSchedule: [...evt.growthSchedule].sort((a, b) => a.fromMonth - b.fromMonth) }
+      : evt
+  );
+  const preparedPlan: Plan = { ...plan, events };
+
   let state: SimState = {
     cashAccount: baseline.cashAccount,
     investmentsBalance: baseline.investmentsBalance,
@@ -335,7 +355,7 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
   let lastResult: StepResult | null = null;
 
   for (let m = 0; m <= clampedTarget; m++) {
-    const result = stepMonth(plan, state, m);
+    const result = stepMonth(preparedPlan, state, m);
     state = result.nextState;
     if (m === clampedTarget) lastResult = result;
   }
@@ -357,6 +377,6 @@ export function getMonthDetail(plan: Plan, targetMonth: number): MonthDetail {
     contributions: r.contributions,
     flags: r.flags,
     runwayMonths: r.runwayMonths,
-    assetsValue: computeAssetsValue(plan.assets ?? [], clampedTarget),
+    assetsValue: computeAssetsValue(preparedPlan.assets ?? [], clampedTarget),
   };
 }

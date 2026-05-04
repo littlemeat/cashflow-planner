@@ -103,6 +103,15 @@ export function monthOffsetToDate(offset: number, startDate: string): string {
 }
 
 /**
+ * Format a runway value (months) for display.
+ * Example: 36 → "36 měs.", Infinity → "∞"
+ */
+export function formatRunway(months: number): string {
+  if (!isFinite(months) || months > 9999) return "∞";
+  return `${Math.round(months)} měs.`;
+}
+
+/**
  * Compute annuity monthly payment for a mortgage.
  * @param principal - loan amount
  * @param annualRate - annual interest rate (e.g. 0.045)
