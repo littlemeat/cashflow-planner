@@ -17,9 +17,9 @@ src/
       index.ts            — simulate(plan): MonthlySnapshot[], getMonthDetail(plan, month): MonthDetail,
                             stepMonth() (shared core step), applyEvents(), computeAssetsValue()
       mortgage.ts         — MortgageState, initMortgageState(), stepMortgage()
-      __tests__/          — 45 tests across 4 files (simulate, presets, phase4, growthSchedule)
-    formatters.ts         — formatCZK, dateToMonthOffset, monthOffsetToDate, addMonths, formatYearMonth,
-                            formatFrequency, formatCategory, computeMonthlyPayment
+      __tests__/          — 58 tests across 5 files (simulate, presets, phase4, growthSchedule, hidden)
+    formatters.ts         — formatCZK, formatRunway, dateToMonthOffset, monthOffsetToDate, addMonths,
+                            formatYearMonth, formatFrequency, formatCategory, computeMonthlyPayment
     constants.ts          — Czech 2026 social/tax constants (PPM cap, rodičovský příspěvek, sleva na dítě)
     seedData.ts           — default plan seeded on first run (uses growthSchedule, schemaVersion: 1)
   components/
@@ -27,6 +27,7 @@ src/
     CollapsiblePanel.tsx  — shared collapsible card wrapper (title, defaultOpen?, headerRight?, children)
     Modal.tsx             — shared backdrop modal with safe mouseDownTarget close pattern
     InfoTooltip.tsx       — shared SVG info icon + tooltip (text, width?, position?)
+    EyeIcon.tsx           — shared eye / eye-slash SVG icon for visibility toggles
     KpiCard.tsx           — single KPI tile used in ResultsSummary
     BaselinePanel.tsx     — start date, cash, investments, yield, safety buffer, horizon
     EventsPanel.tsx       — CRUD + drag-and-drop sort for income/expense events; eye toggle for hidden
@@ -76,7 +77,7 @@ When `startDate` changes, `rebaseOffsets()` in the store recalculates all event/
 Stored as `Mortgage.extraPayments: Array<{ id, month, amount, strategy }>`. `stepMortgage()` in `mortgage.ts` handles each lump sum — strategy `"shorten-term"` recalculates monthly payment from remaining principal + shorter term; `"lower-payment"` keeps original term length.
 
 ### Hidden items
-`CashflowEvent`, `Mortgage`, and `Asset` all have `hidden?: boolean`. When `true`, the item is completely skipped in simulation (no cashflow, no mortgage balance, no asset value). Toggled via eye icon in the panel — calls `updateEvent/updateMortgage/updateAsset` with `{ hidden: !current }`.
+`CashflowEvent`, `Mortgage`, and `Asset` all have `hidden?: boolean` (optional — stays `undefined` on old plans, treated as `false`). When `true`, the item is completely skipped in simulation (no cashflow, no mortgage balance, no asset value). Toggled via eye icon using dedicated store actions `toggleEventHidden(id)` / `toggleMortgageHidden(id)` / `toggleAssetHidden(id)` — these do **not** push to undo history (visibility is not undoable).
 
 ### Plan schema versioning + migration
 `Plan.schemaVersion: number` tracks format version. `migratePlan()` in the store handles:
@@ -133,7 +134,7 @@ SLEVA_NA_DITE_2026 = [1_267, 1_860, 2_320]  // per child per month (1st, 2nd, 3r
 ```
 npm run dev     # start dev server (port 5173)
 npm run build   # production build
-npm test        # vitest (45 tests across 4 files)
+npm test        # vitest (58 tests across 5 files)
 npx tsc --noEmit  # type check
 ```
 
@@ -152,10 +153,17 @@ npx tsc --noEmit  # type check
 - `growthSchedule[].id: string` / `rateSchedule[].id: string` — stable UUID keys for React list rendering, not array index.
 - `getMonthDetail()` runs a full simulation up to `targetMonth` — it's `useMemo`'d in MonthDetailModal.
 - Yearly events (`frequency: "yearly"`) fire on months where `(m - startMonth) % 12 === 0`, not on a fixed calendar month.
-- `hidden` mortgage: its `MortgageState` is carried through the loop untouched (principal stays frozen) and excluded from `mortgageBalance` in the snapshot. This means toggling hidden back on resumes from the correct remaining principal.
+- `hidden?: boolean` is **optional** (not required) — `undefined` and `false` are both treated as visible. Keeps old JSON backups fully compatible without migration. Do not change to required.
+- `hidden` mortgage: its `MortgageState` is carried through the loop untouched (principal stays frozen) and excluded from `mortgageBalance` in the snapshot. `simulate()` always starts fresh from `initMortgageState`, so there is no stale carry-over between user interactions — toggling hidden back on resumes from the correct remaining principal.
+- Visibility toggles (`toggleEventHidden` etc.) intentionally do NOT push to undo history. 20 eye-clicks would fill the entire undo stack and bury meaningful edits. Undo only applies to structural changes (add, update, delete).
+- `growthSchedule` entries are pre-sorted once at the top of `simulate()` and `getMonthDetail()`, not on every event × month iteration. `applyEvents()` therefore receives schedules that are already sorted — do not add a sort inside `applyEvents`.
+- `MortgagePanel` display calculation for multi-rate mortgages iterates through periods with a running `principal` variable — do not revert to the old `principalAtMonth()` helper which always used the first-period rate and gave wrong results for 3+ rate schedules.
 - `InflacniSkok` does NOT split events — it appends a new entry to `growthSchedule` at `fromMonth = targetOffset - evt.startMonth`. This is atomic and undoable.
 - Safety buffer uses a **12-month** trailing average of recurring expenses (excludes one-off events). This smooths out large annual payments (holidays, insurance) so they don't distort the buffer target.
 - `rebaseOffsets` also rebases `asset.acquisitionMonth` — assets must stay at their original calendar dates when `startDate` changes.
+- CSV BOM must be the escape `"﻿"` in source, not a literal invisible `U+FEFF` character. The literal gets silently stripped by some editors, minifiers, or copy-paste and is invisible during code review.
+- CSV columns currently contain only numbers and `YYYY-MM` date strings — no user-supplied text. If a future column adds event names or notes, add a sanitisation step to strip leading `=`, `+`, `-`, `@` characters (CSV formula injection).
+- All preset wizards must use `batchUpdate(recipe)` for any multi-entity operation. Never call `addEvent` + `addMortgage` separately — it produces two undo entries and leaves a dangling expense if the user immediately undoes.
 
 ## Keeping this file up to date
 Update CLAUDE.md whenever: new components are added, simulation logic changes, a new pattern is established, or a feature is completed. The file is the primary onboarding document for new agent sessions — stale information causes mistakes.
