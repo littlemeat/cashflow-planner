@@ -56,6 +56,24 @@ export default function App() {
           alert("Neplatný soubor plánu. Zkontrolujte formát JSON.");
           return;
         }
+        const b = parsed.baseline;
+        if (
+          typeof b.horizonYears !== 'number' || b.horizonYears < 1 ||
+          typeof b.cashAccount !== 'number' ||
+          typeof b.investmentsBalance !== 'number' ||
+          typeof b.safetyBufferMonths !== 'number'
+        ) {
+          alert("Neplatný soubor: základní nastavení obsahuje neplatné hodnoty.");
+          return;
+        }
+        if (parsed.events.some((e: unknown) => !e || typeof (e as Record<string, unknown>).id !== 'string')) {
+          alert("Neplatný soubor: seznam příjmů a výdajů obsahuje neplatné záznamy.");
+          return;
+        }
+        if (parsed.mortgages.some((m: unknown) => !m || typeof (m as Record<string, unknown>).id !== 'string')) {
+          alert("Neplatný soubor: seznam hypoték obsahuje neplatné záznamy.");
+          return;
+        }
         importPlan(parsed);
         alert("Plán byl úspěšně načten.");
       } catch {

@@ -19,6 +19,7 @@ function makePlan(overrides: Partial<Plan> = {}): Plan {
     name: "Test Plan",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    schemaVersion: 1,
     baseline,
     events: [],
     mortgages: [],

@@ -1,8 +1,9 @@
 // Preset wizard: Návrat do práce — adds a new income and optionally ends an existing one
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { usePlanStore } from "../../store/usePlanStore";
 import { CashflowEvent } from "../../types";
 import { AmountInput } from "../AmountInput";
+import { Modal } from "../Modal";
 import { dateToMonthOffset, monthOffsetToDate } from "../../lib/formatters";
 
 interface NavratDoPriceProps {
@@ -10,9 +11,8 @@ interface NavratDoPriceProps {
 }
 
 export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
-  const { plan, addEvent, updateEvent } = usePlanStore();
+  const { plan, batchUpdate } = usePlanStore();
   const startDate = plan.baseline.startDate;
-  const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const incomeEvents = plan.events.filter((e) => e.category === "income");
 
@@ -31,27 +31,34 @@ export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
 
     const groupId = crypto.randomUUID();
 
-    // If an existing income is selected to end, terminate it (only if start is after plan start)
-    if (endEventId !== "none" && fromOffset > 0) {
-      updateEvent(endEventId, {
-        endMonth: fromOffset - 1,
+    batchUpdate((plan) => {
+      let events = plan.events;
+
+      // If an existing income is selected to end, terminate it (only if start is after plan start)
+      if (endEventId !== "none" && fromOffset > 0) {
+        events = events.map((e) =>
+          e.id === endEventId
+            ? { ...e, endMonth: fromOffset - 1, presetGroup: groupId }
+            : e
+        );
+      }
+
+      // Create the new income event
+      const newEvent: CashflowEvent = {
+        id: crypto.randomUUID(),
+        name,
+        category: "income",
+        frequency: "monthly",
+        amount: salaryAmount,
+        startMonth: fromOffset,
+        endMonth: null,
+        annualGrowthPct: growthPct / 100,
         presetGroup: groupId,
-      });
-    }
+      };
 
-    // Create the new income event
-    const newEvent: Omit<CashflowEvent, "id"> = {
-      name,
-      category: "income",
-      frequency: "monthly",
-      amount: salaryAmount,
-      startMonth: fromOffset,
-      endMonth: null,
-      annualGrowthPct: growthPct / 100,
-      presetGroup: groupId,
-    };
+      return { ...plan, events: [...events, newEvent] };
+    });
 
-    addEvent(newEvent);
     setSuccess(true);
   }
 
@@ -62,16 +69,8 @@ export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
   }, [success, onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      <div className="max-h-[80vh] overflow-y-auto -m-6 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Návrat do práce</h3>
           <button
@@ -191,6 +190,6 @@ export function NavratDoPrice({ onClose }: NavratDoPriceProps) {
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

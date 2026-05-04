@@ -51,11 +51,23 @@ export interface Asset {
   linkedMortgageId?: string;      // optional: mortgage tied to this property
 }
 
+/** A half-open month-offset interval: active from `from` (inclusive) to `to` (exclusive, null = forever) */
+export interface Period {
+  from: number;
+  to: number | null;
+}
+
+/** Returns true if month offset `m` falls within the period */
+export function isActiveAt(period: Period, m: number): boolean {
+  return m >= period.from && (period.to === null || m < period.to);
+}
+
 export interface Plan {
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
+  schemaVersion: number;
   baseline: Baseline;
   events: CashflowEvent[];
   mortgages: Mortgage[];

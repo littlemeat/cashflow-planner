@@ -1,11 +1,12 @@
 // Preset wizard: Sleva na dítě — with optional scheduled increases
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { usePlanStore } from "../../store/usePlanStore";
 import { CashflowEvent } from "../../types";
 import { formatCZK, dateToMonthOffset, monthOffsetToDate, addMonths } from "../../lib/formatters";
 import { SLEVA_NA_DITE_2026 } from "../../lib/constants";
 import { AmountInput } from "../AmountInput";
+import { Modal } from "../Modal";
 
 interface SlevaNaDitePresetProps {
   onClose: () => void;
@@ -18,9 +19,8 @@ interface IncreaseEntry {
 }
 
 export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
-  const { plan, addEvent } = usePlanStore();
+  const { plan, batchUpdate } = usePlanStore();
   const startDate = plan.baseline.startDate;
-  const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const [startMonth, setStartMonth] = useState(monthOffsetToDate(0, startDate));
   const [childCount, setChildCount] = useState<1 | 2 | 3>(1);
@@ -77,36 +77,43 @@ export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
       ? dateToMonthOffset(sorted[0]!.month, startDate) - 1
       : null;
 
-    const baseEvent: Omit<CashflowEvent, "id"> = {
-      name: "Sleva na dítě",
-      category: "income",
-      frequency: "monthly",
-      amount: totalSleva,
-      startMonth: wizardStartOffset,
-      endMonth: baseEndOffset,
-      annualGrowthPct: 0,
-      presetGroup: groupId,
-    };
-    addEvent(baseEvent);
+    batchUpdate((plan) => {
+      const newEvents: CashflowEvent[] = [];
 
-    // Each increase creates a new chained event
-    for (let i = 0; i < sorted.length; i++) {
-      const inc = sorted[i]!;
-      const next = sorted[i + 1];
-      const incStartOffset = dateToMonthOffset(inc.month, startDate);
-      const incEndOffset = next ? dateToMonthOffset(next.month, startDate) - 1 : null;
-
-      addEvent({
+      newEvents.push({
+        id: uuidv4(),
         name: "Sleva na dítě",
         category: "income",
         frequency: "monthly",
-        amount: inc.amount,
-        startMonth: incStartOffset,
-        endMonth: incEndOffset,
+        amount: totalSleva,
+        startMonth: wizardStartOffset,
+        endMonth: baseEndOffset,
         annualGrowthPct: 0,
         presetGroup: groupId,
       });
-    }
+
+      // Each increase creates a new chained event
+      for (let i = 0; i < sorted.length; i++) {
+        const inc = sorted[i]!;
+        const next = sorted[i + 1];
+        const incStartOffset = dateToMonthOffset(inc.month, startDate);
+        const incEndOffset = next ? dateToMonthOffset(next.month, startDate) - 1 : null;
+
+        newEvents.push({
+          id: uuidv4(),
+          name: "Sleva na dítě",
+          category: "income",
+          frequency: "monthly",
+          amount: inc.amount,
+          startMonth: incStartOffset,
+          endMonth: incEndOffset,
+          annualGrowthPct: 0,
+          presetGroup: groupId,
+        });
+      }
+
+      return { ...plan, events: [...plan.events, ...newEvents] };
+    });
 
     setSuccess(true);
   }
@@ -118,16 +125,8 @@ export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
   }, [success, onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      <div className="max-h-[80vh] overflow-y-auto -m-6 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Sleva na dítě</h3>
           <button
@@ -257,6 +256,6 @@ export function SlevaNaDitePreset({ onClose }: SlevaNaDitePresetProps) {
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

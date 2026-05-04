@@ -3,13 +3,13 @@ import { useState } from "react";
 import { usePlanStore } from "../store/usePlanStore";
 import { Asset } from "../types";
 import { AssetForm } from "./AssetForm";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 import { formatCZK, formatYearMonth, monthOffsetToDate } from "../lib/formatters";
 
 export function AssetsPanel() {
   const { plan, addAsset, updateAsset, deleteAsset } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
 
   const startDate = plan.baseline.startDate;
   const assets = plan.assets ?? [];
@@ -42,36 +42,19 @@ export function AssetsPanel() {
     return m ? m.name : mortgageId;
   }
 
-  return (
-    <div className="bg-white rounded-xl shadow p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
-        >
-          <svg
-            className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          Majetek
-        </button>
-        {!collapsed && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
-          >
-            + Přidat majetek
-          </button>
-        )}
-      </div>
+  const headerRight = (
+    <button
+      onClick={() => setShowForm(true)}
+      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+    >
+      + Přidat majetek
+    </button>
+  );
 
-      {!collapsed && (
-        assets.length === 0 ? (
+  return (
+    <CollapsiblePanel title="Majetek" headerRight={headerRight}>
+      <>
+        {assets.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">Žádný majetek.</p>
         ) : (
           <div className="space-y-4">
@@ -138,29 +121,29 @@ export function AssetsPanel() {
               );
             })}
           </div>
-        )
-      )}
+        )}
 
-      {showForm && (
-        <AssetForm
-          startDate={startDate}
-          expenses={plan.events}
-          mortgages={plan.mortgages}
-          onSave={handleAdd}
-          onCancel={() => setShowForm(false)}
-        />
-      )}
+        {showForm && (
+          <AssetForm
+            startDate={startDate}
+            expenses={plan.events}
+            mortgages={plan.mortgages}
+            onSave={handleAdd}
+            onCancel={() => setShowForm(false)}
+          />
+        )}
 
-      {editingAsset && (
-        <AssetForm
-          initial={editingAsset}
-          startDate={startDate}
-          expenses={plan.events}
-          mortgages={plan.mortgages}
-          onSave={handleUpdate}
-          onCancel={() => setEditingAsset(null)}
-        />
-      )}
-    </div>
+        {editingAsset && (
+          <AssetForm
+            initial={editingAsset}
+            startDate={startDate}
+            expenses={plan.events}
+            mortgages={plan.mortgages}
+            onSave={handleUpdate}
+            onCancel={() => setEditingAsset(null)}
+          />
+        )}
+      </>
+    </CollapsiblePanel>
   );
 }

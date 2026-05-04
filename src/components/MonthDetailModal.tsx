@@ -1,8 +1,9 @@
 // Modal showing per-event breakdown for a single month
-import { useRef, useMemo } from "react";
+import { useMemo } from "react";
 import { Plan } from "../types";
 import { getMonthDetail } from "../lib/simulate";
 import { formatCZK } from "../lib/formatters";
+import { Modal } from "./Modal";
 
 interface MonthDetailModalProps {
   plan: Plan;
@@ -16,7 +17,6 @@ function formatRunway(months: number): string {
 }
 
 export function MonthDetailModal({ plan, month, onClose }: MonthDetailModalProps) {
-  const mouseDownTarget = useRef<EventTarget | null>(null);
   const detail = useMemo(() => getMonthDetail(plan, month), [plan, month]);
 
   const incomeContributions = detail.contributions.filter((c) => c.category === "income");
@@ -32,16 +32,8 @@ export function MonthDetailModal({ plan, month, onClose }: MonthDetailModalProps
     : detail.date;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      <div className="max-h-[80vh] overflow-y-auto -m-6 p-6 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -185,6 +177,6 @@ export function MonthDetailModal({ plan, month, onClose }: MonthDetailModalProps
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

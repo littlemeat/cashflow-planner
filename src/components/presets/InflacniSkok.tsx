@@ -1,7 +1,8 @@
 // Preset wizard: Inflační skok — splits expense events at a date with a new growth rate
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { usePlanStore } from "../../store/usePlanStore";
 import { CashflowEvent } from "../../types";
+import { Modal } from "../Modal";
 import { dateToMonthOffset, monthOffsetToDate } from "../../lib/formatters";
 
 interface InflacniSkokProps {
@@ -9,9 +10,8 @@ interface InflacniSkokProps {
 }
 
 export function InflacniSkok({ onClose }: InflacniSkokProps) {
-  const { plan, addEvent, updateEvent } = usePlanStore();
+  const { plan, batchUpdate } = usePlanStore();
   const startDate = plan.baseline.startDate;
-  const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const expenseEvents = plan.events.filter((e) => e.category === "expense");
 
@@ -64,38 +64,43 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
     const groupId = crypto.randomUUID();
     const newRate = newGrowthPct / 100;
 
-    for (const evt of expenseEvents) {
-      if (!selectedIds.has(evt.id)) continue;
-      if (fromOffset <= evt.startMonth) continue;
+    batchUpdate((plan) => {
+      let events = plan.events;
+      const eventsToSplit = expenseEvents.filter(
+        (evt) => selectedIds.has(evt.id) && fromOffset > evt.startMonth
+      );
 
-      // Compute the grown amount at the split point
-      const monthsActive = fromOffset - evt.startMonth;
-      const grownAmount =
-        monthsActive > 0
-          ? evt.amount * Math.pow(1 + evt.annualGrowthPct / 12, monthsActive)
-          : evt.amount;
+      for (const evt of eventsToSplit) {
+        // Compute the grown amount at the split point
+        const monthsActive = fromOffset - evt.startMonth;
+        const grownAmount =
+          monthsActive > 0
+            ? evt.amount * Math.pow(1 + evt.annualGrowthPct / 12, monthsActive)
+            : evt.amount;
 
-      // End the original event at fromOffset - 1
-      updateEvent(evt.id, {
-        endMonth: fromOffset - 1,
-        presetGroup: groupId,
-      });
+        // End the original event at fromOffset - 1
+        events = events.map((e) =>
+          e.id === evt.id ? { ...e, endMonth: fromOffset - 1, presetGroup: groupId } : e
+        );
 
-      // Create a new event starting at fromOffset with the new growth rate
-      const newEvent: Omit<CashflowEvent, "id"> = {
-        name: evt.name,
-        category: "expense",
-        frequency: evt.frequency,
-        amount: grownAmount,
-        startMonth: fromOffset,
-        endMonth: evt.endMonth,
-        annualGrowthPct: newRate,
-        notes: evt.notes,
-        presetGroup: groupId,
-      };
+        // Create a new event starting at fromOffset with the new growth rate
+        const newEvent: CashflowEvent = {
+          id: crypto.randomUUID(),
+          name: evt.name,
+          category: "expense",
+          frequency: evt.frequency,
+          amount: grownAmount,
+          startMonth: fromOffset,
+          endMonth: evt.endMonth,
+          annualGrowthPct: newRate,
+          notes: evt.notes,
+          presetGroup: groupId,
+        };
+        events = [...events, newEvent];
+      }
 
-      addEvent(newEvent);
-    }
+      return { ...plan, events };
+    });
 
     setSuccess(true);
   }
@@ -107,16 +112,8 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
   }, [success, onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <Modal onClose={onClose} maxWidth="max-w-lg">
+      <div className="max-h-[80vh] overflow-y-auto -m-6 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Inflační skok</h3>
           <button
@@ -241,6 +238,6 @@ export function InflacniSkok({ onClose }: InflacniSkokProps) {
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

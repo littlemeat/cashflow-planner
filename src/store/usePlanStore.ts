@@ -41,11 +41,13 @@ function rebaseOffsets(plan: Plan, oldStartDate: string, newStartDate: string): 
   return { ...plan, events, mortgages, assets };
 }
 
-// Migrate old plan formats: add assets[] if missing, convert single extraPayment to array
+// Migrate old plan formats: add assets[] if missing, convert single extraPayment to array,
+// add schemaVersion (version 1 = original plan format from phases 1–4, no schemaVersion field)
 function migratePlan(raw: unknown): Plan {
   const plan = raw as Plan & { mortgages: Array<Record<string, unknown>> };
   return {
     ...plan,
+    schemaVersion: plan.schemaVersion ?? 1,
     assets: plan.assets ?? [],
     mortgages: plan.mortgages.map((m) => {
       const legacy = m as unknown as Record<string, unknown>;
@@ -114,6 +116,9 @@ interface PlanStore {
   importPlan: (plan: Plan) => void;
   resetToSeed: () => void;
   reorderEvents: (orderedIds: string[]) => void;
+  /** Apply multiple mutations atomically — results in a single undo history entry */
+  batchUpdate: (recipe: (plan: Plan) => Plan) => void;
+  deletePresetGroup: (groupId: string) => void;
 }
 
 function pushHistory(state: { history: Plan[]; plan: Plan }): Plan[] {
@@ -175,6 +180,10 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       const updated = touchPlan({
         ...state.plan,
         events: state.plan.events.filter((e) => e.id !== id),
+        // Clear linkedExpenseId on any assets that reference the deleted event
+        assets: (state.plan.assets ?? []).map((a) =>
+          a.linkedExpenseId === id ? { ...a, linkedExpenseId: undefined } : a
+        ),
       });
       saveToStorage(updated);
       return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
@@ -203,6 +212,10 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       const updated = touchPlan({
         ...state.plan,
         mortgages: state.plan.mortgages.filter((m) => m.id !== id),
+        // Clear linkedMortgageId on any assets that reference the deleted mortgage
+        assets: (state.plan.assets ?? []).map((a) =>
+          a.linkedMortgageId === id ? { ...a, linkedMortgageId: undefined } : a
+        ),
       });
       saveToStorage(updated);
       return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
@@ -259,5 +272,32 @@ export const usePlanStore = create<PlanStore>()((set) => ({
       const updated = touchPlan({ ...state.plan, events: reordered });
       saveToStorage(updated);
       return { plan: updated, snapshots: simulate(updated), history: pushHistory(state) };
+    }),
+
+  batchUpdate: (recipe) =>
+    set((state) => {
+      const updated = recipe({ ...state.plan });
+      updated.updatedAt = new Date().toISOString();
+      saveToStorage(updated);
+      return {
+        plan: updated,
+        snapshots: simulate(updated),
+        history: [...state.history, state.plan].slice(-50),
+      };
+    }),
+
+  deletePresetGroup: (groupId) =>
+    set((state) => {
+      const updated = {
+        ...state.plan,
+        events: state.plan.events.filter((e) => e.presetGroup !== groupId),
+        updatedAt: new Date().toISOString(),
+      };
+      saveToStorage(updated);
+      return {
+        plan: updated,
+        snapshots: simulate(updated),
+        history: [...state.history, state.plan].slice(-50),
+      };
     }),
 }));

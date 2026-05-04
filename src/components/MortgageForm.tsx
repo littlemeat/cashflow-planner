@@ -1,10 +1,11 @@
 // Add/Edit mortgage modal form — with live amortization summary
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Mortgage } from "../types";
 import { formatCZK, computeMonthlyPayment, dateToMonthOffset, monthOffsetToDate } from "../lib/formatters";
 import { usePlanStore } from "../store/usePlanStore";
 import { AmountInput } from "./AmountInput";
+import { Modal } from "./Modal";
 
 type RateEntry = { id: string; fromMonth: number; rateAnnual: number };
 type MortgageFormData = Omit<Mortgage, "id">;
@@ -275,7 +276,6 @@ function AmortizationSummary({ summary, termMonths }: { summary: AmortSummary; t
 export function MortgageForm({ initial, onSave, onCancel }: MortgageFormProps) {
   const { plan } = usePlanStore();
   const startDate = plan.baseline.startDate;
-  const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const [form, setForm] = useState<MortgageFormData>(
     initial
@@ -365,261 +365,251 @@ export function MortgageForm({ initial, onSave, onCancel }: MortgageFormProps) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => { mouseDownTarget.current = e.target; }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownTarget.current === e.currentTarget) {
-          onCancel();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">
-            {initial ? "Upravit hypotéku" : "Přidat hypotéku"}
-          </h3>
+    <Modal onClose={onCancel} maxWidth="max-w-3xl">
+      <div className="max-h-[80vh] overflow-y-auto -m-6 p-6">
+        <h3 className="text-lg font-semibold text-gray-800">
+          {initial ? "Upravit hypotéku" : "Přidat hypotéku"}
+        </h3>
 
-          {/* Two-column layout: form on left, amort summary on right */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left: form fields */}
-            <form onSubmit={handleSubmit} className="space-y-3" id="mortgage-form">
-              {/* Name */}
-              <div>
-                <label htmlFor="mortgage-name" className="block text-sm font-medium text-gray-700 mb-1">Název</label>
-                <input
-                  id="mortgage-name"
-                  type="text"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                  placeholder="např. Hypo byt"
-                />
+        {/* Two-column layout: form on left, amort summary on right */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          {/* Left: form fields */}
+          <form onSubmit={handleSubmit} className="space-y-3" id="mortgage-form">
+            {/* Name */}
+            <div>
+              <label htmlFor="mortgage-name" className="block text-sm font-medium text-gray-700 mb-1">Název</label>
+              <input
+                id="mortgage-name"
+                type="text"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+                placeholder="např. Hypo byt"
+              />
+            </div>
+
+            {/* Principal */}
+            <div>
+              <label htmlFor="mortgage-principal" className="block text-sm font-medium text-gray-700 mb-1">Jistina (Kč)</label>
+              <AmountInput
+                id="mortgage-principal"
+                value={form.principal}
+                onChange={(v) => setForm((prev) => ({ ...prev, principal: v }))}
+                min={0}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Start month */}
+            <div>
+              <label htmlFor="mortgage-startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                Začátek splácení
+              </label>
+              <input
+                id="mortgage-startDate"
+                type="month"
+                value={monthOffsetToDate(form.startMonth, startDate)}
+                min={startDate}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    startMonth: dateToMonthOffset(e.target.value, startDate),
+                  }))
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Term — entered in years, stored as months */}
+            <div>
+              <label htmlFor="mortgage-termYears" className="block text-sm font-medium text-gray-700 mb-1">
+                Délka (roky)
+              </label>
+              <input
+                id="mortgage-termYears"
+                type="number"
+                value={Math.round(form.termMonths / 12)}
+                onChange={(e) => {
+                  const years = Math.max(1, parseInt(e.target.value) || 1);
+                  setForm((prev) => ({ ...prev, termMonths: years * 12 }));
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={1}
+                max={50}
+                step={1}
+              />
+              <p className="text-xs text-gray-400 mt-0.5">= {form.termMonths} měsíců</p>
+            </div>
+
+            {/* Insurance */}
+            <div>
+              <label htmlFor="mortgage-insuranceMonthly" className="block text-sm font-medium text-gray-700 mb-1">
+                Pojistné (Kč/měs.)
+              </label>
+              <AmountInput
+                id="mortgage-insuranceMonthly"
+                value={form.insuranceMonthly ?? 0}
+                onChange={(v) => setForm((prev) => ({ ...prev, insuranceMonthly: v }))}
+                min={0}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Rate schedule */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Harmonogram sazeb</label>
+                <button
+                  type="button"
+                  onClick={addRatePeriod}
+                  className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                >
+                  + Přidat období
+                </button>
               </div>
-
-              {/* Principal */}
-              <div>
-                <label htmlFor="mortgage-principal" className="block text-sm font-medium text-gray-700 mb-1">Jistina (Kč)</label>
-                <AmountInput
-                  id="mortgage-principal"
-                  value={form.principal}
-                  onChange={(v) => setForm((prev) => ({ ...prev, principal: v }))}
-                  min={0}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Start month */}
-              <div>
-                <label htmlFor="mortgage-startDate" className="block text-sm font-medium text-gray-700 mb-1">
-                  Začátek splácení
-                </label>
-                <input
-                  id="mortgage-startDate"
-                  type="month"
-                  value={monthOffsetToDate(form.startMonth, startDate)}
-                  min={startDate}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      startMonth: dateToMonthOffset(e.target.value, startDate),
-                    }))
-                  }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Term — entered in years, stored as months */}
-              <div>
-                <label htmlFor="mortgage-termYears" className="block text-sm font-medium text-gray-700 mb-1">
-                  Délka (roky)
-                </label>
-                <input
-                  id="mortgage-termYears"
-                  type="number"
-                  value={Math.round(form.termMonths / 12)}
-                  onChange={(e) => {
-                    const years = Math.max(1, parseInt(e.target.value) || 1);
-                    setForm((prev) => ({ ...prev, termMonths: years * 12 }));
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min={1}
-                  max={50}
-                  step={1}
-                />
-                <p className="text-xs text-gray-400 mt-0.5">= {form.termMonths} měsíců</p>
-              </div>
-
-              {/* Insurance */}
-              <div>
-                <label htmlFor="mortgage-insuranceMonthly" className="block text-sm font-medium text-gray-700 mb-1">
-                  Pojistné (Kč/měs.)
-                </label>
-                <AmountInput
-                  id="mortgage-insuranceMonthly"
-                  value={form.insuranceMonthly ?? 0}
-                  onChange={(v) => setForm((prev) => ({ ...prev, insuranceMonthly: v }))}
-                  min={0}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Rate schedule */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Harmonogram sazeb</label>
-                  <button
-                    type="button"
-                    onClick={addRatePeriod}
-                    className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                  >
-                    + Přidat období
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {form.rateSchedule.map((rate) => (
-                    <div key={rate.id} className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label htmlFor={"rate-from-" + rate.id} className="block text-xs text-gray-500 mb-1">Od měsíce (od zah. hypotéky)</label>
-                        <input
-                          id={"rate-from-" + rate.id}
-                          type="number"
-                          value={rate.fromMonth}
-                          onChange={(e) => handleRateChange(rate.id, "fromMonth", e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          min={0}
-                          step={1}
-                        />
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          = {monthOffsetToDate(form.startMonth + rate.fromMonth, startDate).replace("-", "/")}
-                        </p>
-                      </div>
-                      <div className="flex-1">
-                        <label htmlFor={"rate-annual-" + rate.id} className="block text-xs text-gray-500 mb-1">Sazba (%)</label>
-                        <input
-                          id={"rate-annual-" + rate.id}
-                          type="number"
-                          value={(rate.rateAnnual * 100).toFixed(2)}
-                          onChange={(e) => handleRateChange(rate.id, "rateAnnual", e.target.value)}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          min={0}
-                          max={100}
-                          step={0.05}
-                        />
-                      </div>
-                      {form.rateSchedule.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRatePeriod(rate.id)}
-                          className="text-red-400 hover:text-red-600 pb-2"
-                        >
-                          ✕
-                        </button>
-                      )}
+              <div className="space-y-2">
+                {form.rateSchedule.map((rate) => (
+                  <div key={rate.id} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label htmlFor={"rate-from-" + rate.id} className="block text-xs text-gray-500 mb-1">Od měsíce (od zah. hypotéky)</label>
+                      <input
+                        id={"rate-from-" + rate.id}
+                        type="number"
+                        value={rate.fromMonth}
+                        onChange={(e) => handleRateChange(rate.id, "fromMonth", e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min={0}
+                        step={1}
+                      />
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        = {monthOffsetToDate(form.startMonth + rate.fromMonth, startDate).replace("-", "/")}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Extra payments (Mimořádné splátky) */}
-              <div className="border-t border-gray-100 pt-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Mimořádné splátky</span>
-                  <button
-                    type="button"
-                    onClick={addExtraPayment}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    + Přidat splátku
-                  </button>
-                </div>
-                {extraPayments.length === 0 && (
-                  <p className="text-xs text-gray-400 italic">Žádné mimořádné splátky.</p>
-                )}
-                {extraPayments.map((ep, idx) => (
-                  <div key={ep.id} className="pl-2 border-l-2 border-blue-100 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-600">Splátka {idx + 1}</span>
+                    <div className="flex-1">
+                      <label htmlFor={"rate-annual-" + rate.id} className="block text-xs text-gray-500 mb-1">Sazba (%)</label>
+                      <input
+                        id={"rate-annual-" + rate.id}
+                        type="number"
+                        value={(rate.rateAnnual * 100).toFixed(2)}
+                        onChange={(e) => handleRateChange(rate.id, "rateAnnual", e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min={0}
+                        max={100}
+                        step={0.05}
+                      />
+                    </div>
+                    {form.rateSchedule.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => removeExtraPayment(ep.id)}
-                        className="text-xs text-red-400 hover:text-red-600"
+                        onClick={() => removeRatePeriod(rate.id)}
+                        className="text-red-400 hover:text-red-600 pb-2"
                       >
-                        Odebrat
+                        ✕
                       </button>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Měsíc splátky</label>
-                      <input
-                        type="month"
-                        value={monthOffsetToDate(ep.month, startDate)}
-                        min={startDate}
-                        onChange={(e) =>
-                          updateExtraPayment(ep.id, "month", dateToMonthOffset(e.target.value, startDate))
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Výše (Kč)</label>
-                      <AmountInput
-                        value={ep.amount}
-                        onChange={(v) => updateExtraPayment(ep.id, "amount", v)}
-                        min={0}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Strategie</label>
-                      <select
-                        value={ep.strategy}
-                        onChange={(e) =>
-                          updateExtraPayment(ep.id, "strategy", e.target.value as "shorten-term" | "lower-payment")
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="shorten-term">Zkrátit dobu splácení</option>
-                        <option value="lower-payment">Snížit splátku</option>
-                      </select>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
-            </form>
-
-            {/* Right: live amortization summary */}
-            <div className="flex flex-col gap-4">
-              {amortSummary ? (
-                <AmortizationSummary summary={amortSummary} termMonths={form.termMonths} />
-              ) : (
-                <div className="border border-dashed border-gray-200 rounded-xl p-6 flex items-center justify-center text-sm text-gray-400 text-center">
-                  Zadejte jistinu a délku splácení pro zobrazení přehledu
-                </div>
-              )}
             </div>
-          </div>
 
-          {/* Action buttons (outside the form, submitted via form id) */}
-          <div className="flex gap-3 pt-2 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 text-sm transition-colors"
-            >
-              Zrušit
-            </button>
-            <button
-              type="submit"
-              form="mortgage-form"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
-            >
-              {initial ? "Uložit změny" : "Přidat"}
-            </button>
+            {/* Extra payments (Mimořádné splátky) */}
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Mimořádné splátky</span>
+                <button
+                  type="button"
+                  onClick={addExtraPayment}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  + Přidat splátku
+                </button>
+              </div>
+              {extraPayments.length === 0 && (
+                <p className="text-xs text-gray-400 italic">Žádné mimořádné splátky.</p>
+              )}
+              {extraPayments.map((ep, idx) => (
+                <div key={ep.id} className="pl-2 border-l-2 border-blue-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-600">Splátka {idx + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeExtraPayment(ep.id)}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Odebrat
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Měsíc splátky</label>
+                    <input
+                      type="month"
+                      value={monthOffsetToDate(ep.month, startDate)}
+                      min={startDate}
+                      onChange={(e) =>
+                        updateExtraPayment(ep.id, "month", dateToMonthOffset(e.target.value, startDate))
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Výše (Kč)</label>
+                    <AmountInput
+                      value={ep.amount}
+                      onChange={(v) => updateExtraPayment(ep.id, "amount", v)}
+                      min={0}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Strategie</label>
+                    <select
+                      value={ep.strategy}
+                      onChange={(e) =>
+                        updateExtraPayment(ep.id, "strategy", e.target.value as "shorten-term" | "lower-payment")
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="shorten-term">Zkrátit dobu splácení</option>
+                      <option value="lower-payment">Snížit splátku</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </form>
+
+          {/* Right: live amortization summary */}
+          <div className="flex flex-col gap-4">
+            {amortSummary ? (
+              <AmortizationSummary summary={amortSummary} termMonths={form.termMonths} />
+            ) : (
+              <div className="border border-dashed border-gray-200 rounded-xl p-6 flex items-center justify-center text-sm text-gray-400 text-center">
+                Zadejte jistinu a délku splácení pro zobrazení přehledu
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Action buttons (outside the form, submitted via form id) */}
+        <div className="flex gap-3 pt-4 mt-4 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg px-4 py-2 text-sm transition-colors"
+          >
+            Zrušit
+          </button>
+          <button
+            type="submit"
+            form="mortgage-form"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors"
+          >
+            {initial ? "Uložit změny" : "Přidat"}
+          </button>
+        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

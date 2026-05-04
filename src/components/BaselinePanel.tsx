@@ -3,12 +3,12 @@ import React, { useState, useEffect } from "react";
 import { usePlanStore } from "../store/usePlanStore";
 import { Baseline } from "../types";
 import { AmountInput } from "./AmountInput";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 
 export function BaselinePanel() {
   const { plan, setBaseline } = usePlanStore();
   const [form, setForm] = useState<Baseline>(plan.baseline);
   const [saved, setSaved] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
 
   // Sync if plan changes externally (import/reset)
   useEffect(() => {
@@ -36,20 +36,8 @@ export function BaselinePanel() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
-        >
-          <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          Počáteční nastavení
-        </button>
-      </div>
-      {!collapsed && <form onSubmit={handleSubmit} className="space-y-4">
+    <CollapsiblePanel title="Počáteční nastavení">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Grid: 1 col mobile → 2 col sm → 3 col md */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
@@ -168,7 +156,7 @@ export function BaselinePanel() {
         >
           {saved ? "Uloženo ✓" : "Uložit nastavení"}
         </button>
-      </form>}
-    </div>
+      </form>
+    </CollapsiblePanel>
   );
 }

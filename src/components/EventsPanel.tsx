@@ -21,6 +21,8 @@ import { usePlanStore } from "../store/usePlanStore";
 import { CashflowEvent } from "../types";
 import { EventForm } from "./EventForm";
 import { PresetPicker } from "./presets/PresetPicker";
+import { CollapsiblePanel } from "./CollapsiblePanel";
+import { InfoTooltip } from "./InfoTooltip";
 import {
   formatCZK,
   formatFrequency,
@@ -33,14 +35,27 @@ type SortField = "name" | "category" | "startMonth" | "amount";
 type SortDir = "asc" | "desc";
 
 export function EventsPanel() {
-  const { plan, addEvent, updateEvent, deleteEvent, reorderEvents } = usePlanStore();
+  const { plan, addEvent, updateEvent, deleteEvent, reorderEvents, deletePresetGroup } = usePlanStore();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CashflowEvent | null>(null);
   const [sortField, setSortField] = useState<SortField | null>(null); // null = stored order
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [collapsed, setCollapsed] = useState(false);
 
   const startDate = plan.baseline.startDate;
+
+  // Compute preset groups that have 2+ events — these show the "Smazat preset" button
+  const presetGroupCounts = new Map<string, number>();
+  for (const evt of plan.events) {
+    if (evt.presetGroup) {
+      presetGroupCounts.set(evt.presetGroup, (presetGroupCounts.get(evt.presetGroup) ?? 0) + 1);
+    }
+  }
+
+  function handleDeletePresetGroup(groupId: string) {
+    if (window.confirm("Smazat všechny události tohoto presetu?")) {
+      deletePresetGroup(groupId);
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -116,78 +131,69 @@ export function EventsPanel() {
     }`;
   }
 
+  const headerRight = (
+    <>
+      <PresetPicker />
+      <button
+        onClick={() => setShowForm(true)}
+        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+      >
+        + Přidat položku
+      </button>
+    </>
+  );
+
   return (
-    <div className="bg-white rounded-xl shadow p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          className="flex items-center gap-2 text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors"
-        >
-          <svg className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          Příjmy a výdaje
-        </button>
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <PresetPicker />
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
-            >
-              + Přidat položku
-            </button>
-          </div>
+    <CollapsiblePanel title="Příjmy a výdaje" headerRight={headerRight}>
+      <>
+        {plan.events.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Žádné položky. Přidejte první.</p>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="w-6 px-2 py-2" aria-label="Přetáhnout" />
+                    <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
+                    <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
+                    <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekv.</th>
+                    <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
+                  </tr>
+                </thead>
+                <SortableContext items={displayedEvents.map((e) => e.id)} strategy={verticalListSortingStrategy}>
+                  <tbody>
+                    {displayedEvents.map((event) => (
+                      <SortableEventRow
+                        key={event.id}
+                        event={event}
+                        startDate={startDate}
+                        onEdit={() => setEditingEvent(event)}
+                        onDelete={() => handleDelete(event.id)}
+                        onDeletePreset={
+                          event.presetGroup && (presetGroupCounts.get(event.presetGroup) ?? 0) >= 2
+                            ? () => handleDeletePresetGroup(event.presetGroup!)
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </table>
+            </div>
+          </DndContext>
         )}
-      </div>
 
-      {!collapsed && (
-        <>
-          {plan.events.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">Žádné položky. Přidejte první.</p>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[480px]">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="w-6 px-2 py-2" aria-label="Přetáhnout" />
-                      <th className={thClass("name")} onClick={() => handleSort("name")}>Název <SortIcon field="name" /></th>
-                      <th className={thClass("category")} onClick={() => handleSort("category")}>Kat. <SortIcon field="category" /></th>
-                      <th className={thClass("amount")} onClick={() => handleSort("amount")}>Částka <SortIcon field="amount" /></th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Frekv.</th>
-                      <th className={thClass("startMonth")} onClick={() => handleSort("startMonth")}>Od <SortIcon field="startMonth" /></th>
-                      <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Do</th>
-                      <th className="hidden sm:table-cell px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Růst %</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Akce</th>
-                    </tr>
-                  </thead>
-                  <SortableContext items={displayedEvents.map((e) => e.id)} strategy={verticalListSortingStrategy}>
-                    <tbody>
-                      {displayedEvents.map((event) => (
-                        <SortableEventRow
-                          key={event.id}
-                          event={event}
-                          startDate={startDate}
-                          onEdit={() => setEditingEvent(event)}
-                          onDelete={() => handleDelete(event.id)}
-                        />
-                      ))}
-                    </tbody>
-                  </SortableContext>
-                </table>
-              </div>
-            </DndContext>
-          )}
-
-          {showForm && <EventForm onSave={handleAdd} onCancel={() => setShowForm(false)} />}
-          {editingEvent && (
-            <EventForm initial={editingEvent} onSave={handleUpdate} onCancel={() => setEditingEvent(null)} />
-          )}
-        </>
-      )}
-    </div>
+        {showForm && <EventForm onSave={handleAdd} onCancel={() => setShowForm(false)} horizonMonths={plan.baseline.horizonYears * 12} />}
+        {editingEvent && (
+          <EventForm initial={editingEvent} onSave={handleUpdate} onCancel={() => setEditingEvent(null)} horizonMonths={plan.baseline.horizonYears * 12} />
+        )}
+      </>
+    </CollapsiblePanel>
   );
 }
 
@@ -198,9 +204,10 @@ interface SortableEventRowProps {
   startDate: string;
   onEdit: () => void;
   onDelete: () => void;
+  onDeletePreset?: () => void;
 }
 
-function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventRowProps) {
+function SortableEventRow({ event, startDate, onEdit, onDelete, onDeletePreset }: SortableEventRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: event.id });
 
@@ -238,15 +245,8 @@ function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventR
         <span className="flex items-center gap-1.5">
           {event.name}
           {event.notes && (
-            <span className="relative group ml-1 flex-shrink-0">
-              <svg className="w-3.5 h-3.5 text-gray-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" />
-              </svg>
-              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 text-white text-xs px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal leading-relaxed">
-                {event.notes}
-                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
-              </span>
+            <span className="ml-1 flex-shrink-0">
+              <InfoTooltip text={event.notes} width="w-56" />
             </span>
           )}
         </span>
@@ -270,9 +270,12 @@ function SortableEventRow({ event, startDate, onEdit, onDelete }: SortableEventR
         {event.annualGrowthPct !== 0 ? `${(event.annualGrowthPct * 100).toFixed(1)} %` : "—"}
       </td>
       <td className="px-3 py-2">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={onEdit} className="text-blue-500 hover:text-blue-700 text-xs font-medium">Upravit</button>
           <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs font-medium">Smazat</button>
+          {onDeletePreset && (
+            <button onClick={onDeletePreset} className="text-orange-400 hover:text-orange-600 text-xs font-medium">Smazat preset</button>
+          )}
         </div>
       </td>
     </tr>

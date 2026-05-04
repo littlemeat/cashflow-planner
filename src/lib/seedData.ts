@@ -6,6 +6,7 @@ export const SEED_PLAN: Plan = {
   name: "Můj finanční plán",
   createdAt: "2026-04-24T00:00:00.000Z",
   updatedAt: "2026-04-24T00:00:00.000Z",
+  schemaVersion: 1,
   baseline: {
     startDate: "2026-09",
     cashAccount: 1010000,
